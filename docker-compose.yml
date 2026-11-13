@@ -1,0 +1,144 @@
+# ASPICE ALM - Docker Compose (로컬 개발 + OCI 무료 티어)
+# 실행: docker compose up -d
+# 중지: docker compose down
+# 로그: docker compose logs -f
+
+version: '3.8'
+
+services:
+  # ── PostgreSQL (메인 DB) ──────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: alm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: alm
+      POSTGRES_USER: alm
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-alm_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alm -d alm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 2g
+    cpus: 1.0
+
+  # ── Redis (캐시 + 세션 + Bull Queue) ──────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: alm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+    cpus: 0.5
+    command: redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru
+
+  # ── Meilisearch (검색 엔진) ──────────────────────────────
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: alm-meilisearch
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    environment:
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-dev-master-key}
+      - MEILI_ENV=development
+      - MEILI_NO_ANALYTICS=true
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+    cpus: 0.5
+
+  # ── MinIO (파일 저장, S3 호환) ───────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: alm-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+    cpus: 0.5
+
+  # ── Keycloak (인증/SSO) ──────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: alm-keycloak
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - KEYCLOAK_ADMIN=${KC_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PASSWORD:-admin}
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/alm
+      - KC_DB_USERNAME=alm
+      - KC_DB_PASSWORD=${DB_PASSWORD:-alm_dev_password}
+      - KC_HOSTNAME_STRICT=false
+      - KC_HTTP_ENABLED=true
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080; echo -e 'GET /health/ready HTTP/1.1\\r\\nhost: http://localhost\\r\\nConnection: close\\r\\n\\r' >&3; cat <&3 | grep -q '200 OK'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    mem_limit: 2g
+    cpus: 1.0
+
+  # ── Caddy (리버스 프록시) ────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: alm-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    mem_limit: 128m
+    cpus: 0.25
+
+volumes:
+  pg_data:
+  redis_data:
+  meili_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
