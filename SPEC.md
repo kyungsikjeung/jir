@@ -1,755 +1,2050 @@
-# Just Enough Spec — ASPICE ALM
+generator client {
+  provider = "prisma-client-js"
+}
 
-> 모듈별 200줄 이내의 "Just Enough" 명세.
-> AI가 이 문서만 보고 정확하게 구현할 수 있도록 작성.
-> 각 모듈: Requirements → API Contract → Data Model → Business Rules → Dependencies → Acceptance Criteria
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════
+// 01. Core (사용자, 조직, 역할, 권한)
+// ═══════════════════════════════════════════
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  domain    String
+  logoUrl   String?
+  plan      String   @default("free")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  spaces    Space[]
+  users     User[]
+  projectTemplates ProjectTemplate[]
+  externalOrgs ExternalOrganization[]
+  systemSettings SystemSetting[]
+  invitations  Invitation[]
+  sharedComponents SharedComponent[]
+  apiKeys   ApiKey[]
+  webhooks  Webhook[]
+  ndaDocuments NdaDocument[]
+  spaceTemplatesApplied SpaceTemplateApplied[]
+
+  @@map("organizations")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  email         String   @unique
+  passwordHash  String?
+  displayName   String
+  avatarUrl     String?
+  title         String?
+  department    String?
+  isInternal    Boolean  @default(false)
+  isVerified    Boolean  @default(false)
+  isApproved    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  isExternal    Boolean  @default(false)
+  lastLoginAt   DateTime?
+  contractStart DateTime?
+  contractEnd   DateTime?
+  isTemporary   Boolean  @default(false)
+  invitedById   String?
+  invitedBy     User?    @relation("invitedBy", fields: [invitedById], references: [id])
+  invitedUsers   User[]   @relation("invitedBy")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  roles         UserRole[]
+  spaceMembers  SpaceMember[]
+  assignedItems WorkItem[] @relation("assignee")
+  reportedItems WorkItem[] @relation("reporter")
+  identities    UserIdentity[]
+  sessions      UserSession[]
+  comments      Comment[]
+  resolvedComments Comment[] @relation("resolver")
+  attachments   Attachment[]
+  requirements  Requirement[]
+  testRuns      TestRun[]
+  testResults   TestResult[]
+  baselines     Baseline[]
+  releases      Release[]
+  reviews       Review[]
+  reviewParticipants ReviewParticipant[]
+  reviewFindings ReviewFinding[]
+  approvals     Approval[]
+  signatures    ElectronicSignature[]
+  ndaSignatures NdaSignature[]
+  workflows     Workflow[]
+  pageTemplates PageTemplate[]
+  projectTemplates ProjectTemplate[]
+  projectDeliverables ProjectDeliverable[]
+  processAssessments ProcessAssessment[]
+  complianceChecklists ComplianceChecklist[]
+  apiKeys       ApiKey[]
+  mcpSessions   McpSession[]
+  webhooks      Webhook[]
+  urlAccessLogs UrlAccessLog[]
+  activityFeeds ActivityFeed[]
+  notifications Notification[]
+  notificationPrefs NotificationPreference[]
+  auditLogs     AuditLog[]
+  systemAuditLogs SystemAuditLog[]
+  systemSettings SystemSetting[]
+  spaceTemplatesApplied SpaceTemplateApplied[]
+  spaceStakeholderAccess SpaceStakeholderAccess[]
+  stakeholderProfiles UserStakeholderProfile[]
+  spaceDailyMetrics SpaceDailyMetric[]
+  backlogRankings BacklogRanking[]
+  sprintItems   SprintItem[]
+  crossProjectLinks CrossProjectLink[]
+  sharedComponents SharedComponent[]
+  componentUsages ComponentUsage[]
+  workItemVersions WorkItemVersion[]
+  workItemLinks WorkItemLink[]
+  workItemDependencies WorkItemDependency[] @relation("depFrom")
+  workItemDependenciesTo WorkItemDependency[] @relation("depTo")
+  traceLinks    TraceLink[]
+  suspectLinksMarked SuspectLink[] @relation("markedBy")
+  suspectLinksResolved SuspectLink[] @relation("resolvedBy")
+  traceMatrixSnapshots TraceMatrixSnapshot[]
+  coverageReports CoverageReport[]
+  evidenceLinks EvidenceLink[]
+  urlSlugs      UrlSlug[]
+  workItemWatchers WorkItemWatcher[]
+  testSuites    TestSuite[]
+  sprintItemsAdded SprintItem[] @relation("addedBy")
+  spaceMembersAdded SpaceMember[] @relation("addedBy")
+  registrationRequests RegistrationRequest[]
+  reviewedRegistrations RegistrationRequest[] @relation("reviewedBy")
+  approvalAuditLogs ApprovalAuditLog[] @relation("targetUser")
+  performedApprovalAudits ApprovalAuditLog[] @relation("performer")
+  acceptedInvitations Invitation[] @relation("acceptedBy")
+  invitedInvitations Invitation[] @relation("invitedBy")
+  roleResponsibilities RoleResponsibility[]
+  @@index([orgId])
+  @@index([email])
+  @@map("users")
+}
+
+model UserIdentity {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String
+  providerUid String
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  @@unique([provider, providerUid])
+  @@map("user_identities")
+}
+
+model UserSession {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  ipAddress   String?
+  userAgent   String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  revokedAt   DateTime?
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  orgId       String?
+  org         Organization? @relation(fields: [orgId], references: [id])
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  isSuperAdmin Boolean @default(false)
+  isAdmin     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  permissions RolePermission[]
+  userRoles   UserRole[]
+  spaceMembers SpaceMember[]
+  roleResponsibilities RoleResponsibility[]
+  approvalAuditLogs ApprovalAuditLog[]
+  @@unique([orgId, name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  category    String
+  action      String
+  resource    String
+  isSystem    Boolean  @default(false)
+  roles       RolePermission[]
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedAt    DateTime   @default(now())
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  spaceId    String?
+  space      Space?   @relation(fields: [spaceId], references: [id])
+  grantedBy  String?
+  grantedByUser User?  @relation(fields: [grantedBy], references: [id])
+  grantedAt  DateTime @default(now())
+  expiresAt  DateTime?
+  @@id([userId, roleId, spaceId])
+  @@map("user_roles")
+}
+
+// ═══════════════════════════════════════════
+// 02. Spaces
+// ═══════════════════════════════════════════
+
+model Space {
+  id               String   @id @default(uuid())
+  orgId            String
+  org              Organization @relation(fields: [orgId], references: [id])
+  key              String   @unique
+  name             String
+  description      String?
+  spaceType        String   @default("software")
+  iconUrl          String?
+  aspiceLevel      String   @default("2")
+  automotiveDomain String?
+  processProfile   String   @default("default")
+  defaultWorkflowId String?
+  defaultWorkflow  Workflow? @relation(fields: [defaultWorkflowId], references: [id])
+  settings         Json     @default("{}")
+  isArchived       Boolean  @default(false)
+  createdById      String?
+  createdBy        User?    @relation(fields: [createdById], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  members          SpaceMember[]
+  workItems        WorkItem[]
+  settingsRel      SpaceSettings?
+  components       Component[]
+  labels           Label[]
+  versions         Version[]
+  boards           Board[]
+  sprints          Sprint[]
+  testSuites       TestSuite[]
+  testRuns         TestRun[]
+  baselines        Baseline[]
+  releases         Release[]
+  workflows        Workflow[]
+  pageTemplates    PageTemplate[]
+  reviews          Review[]
+  activityFeeds    ActivityFeed[]
+  spaceProcessAreas SpaceProcessArea[]
+  projectDeliverables ProjectDeliverable[]
+  processAssessments ProcessAssessment[]
+  complianceChecklists ComplianceChecklist[]
+  spaceStakeholderAccess SpaceStakeholderAccess[]
+  spaceDailyMetrics SpaceDailyMetric[]
+  backlogRankings  BacklogRanking[]
+  spaceTemplatesApplied SpaceTemplateApplied[]
+  sharedComponents SharedComponent[]
+  componentUsages  ComponentUsage[]
+  roleResponsibilities RoleResponsibility[]
+  webhooks         Webhook[]
+  crossProjectLinksFrom CrossProjectLink[] @relation("fromSpace")
+  crossProjectLinksTo   CrossProjectLink[] @relation("toSpace")
+  userRoles        UserRole[]
+  @@index([orgId])
+  @@index([key])
+  @@map("spaces")
+}
+
+model SpaceMember {
+  spaceId   String
+  space     Space  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role   @relation(fields: [roleId], references: [id])
+  addedById String?
+  addedBy   User?  @relation("addedBy", fields: [addedById], references: [id])
+  addedAt   DateTime @default(now())
+  @@id([spaceId, userId])
+  @@map("space_members")
+}
+
+model SpaceSettings {
+  spaceId                   String  @id
+  space                     Space   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  defaultPageTemplateId     String?
+  defaultPageTemplate       PageTemplate? @relation(fields: [defaultPageTemplateId], references: [id])
+  allowAnonymousView        Boolean @default(false)
+  requireApprovalForRelease Boolean @default(true)
+  minApprovers              Int     @default(1)
+  autoSuspectLinks          Boolean @default(true)
+  requireTraceForRelease    Boolean @default(true)
+  notificationChannels      Json    @default("[\"in_app\", \"email\"]")
+  aspiceLevel               String  @default("2")
+  requireEvidenceForAll     Boolean @default(false)
+  updatedAt                 DateTime @updatedAt
+  @@map("space_settings")
+}
+
+model Component {
+  id          String   @id @default(uuid())
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  leadUserId  String?
+  leadUser    User?    @relation(fields: [leadUserId], references: [id])
+  createdAt   DateTime @default(now())
+  @@unique([spaceId, name])
+  @@map("components")
+}
+
+model Label {
+  id      String   @id @default(uuid())
+  spaceId String
+  space   Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name    String
+  color   String   @default("#6B7280")
+  @@unique([spaceId, name])
+  @@map("labels")
+}
+
+model Version {
+  id          String   @id @default(uuid())
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  releaseDate DateTime?
+  status      String   @default("unreleased")
+  createdAt   DateTime @default(now())
+  @@unique([spaceId, name])
+  @@map("versions")
+}
+
+// ═══════════════════════════════════════════
+// 03. Work Items
+// ═══════════════════════════════════════════
+
+model WorkItemType {
+  id             String   @id @default(uuid())
+  spaceId        String
+  space          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name           String
+  icon           String?
+  color          String?
+  hierarchyLevel Int      @default(0)
+  isSubtask      Boolean  @default(false)
+  aspiceProcess  String?
+  createdAt      DateTime @default(now())
+  workItems      WorkItem[]
+  @@unique([spaceId, name])
+  @@map("work_item_types")
+}
+
+model WorkItem {
+  id              String   @id @default(uuid())
+  spaceId         String
+  space           Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  typeId          String
+  type            WorkItemType @relation(fields: [typeId], references: [id])
+  key             String
+  title           String
+  description     String?
+  status          String   @default("open")
+  priority        String   @default("medium")
+  assigneeId      String?
+  assignee        User?    @relation("assignee", fields: [assigneeId], references: [id])
+  reporterId      String?
+  reporter        User?    @relation("reporter", fields: [reporterId], references: [id])
+  parentId        String?
+  parent          WorkItem? @relation("parent", fields: [parentId], references: [id])
+  children        WorkItem[] @relation("parent")
+  epicId          String?
+  epic            WorkItem? @relation("epic", fields: [epicId], references: [id])
+  epics           WorkItem[] @relation("epic")
+  workflowStateId String?
+  workflowState   WorkflowState? @relation(fields: [workflowStateId], references: [id])
+  version         Int      @default(1)
+  baselineId      String?
+  baseline        Baseline? @relation(fields: [baselineId], references: [id])
+  body            Json?
+  bodyText        String?
+  labels          String[]
+  components      String[]
+  fixVersions     String[]
+  dueDate         DateTime?
+  storyPoints     Int?
+  aspiceProcess   String?
+  asilLevel       String?
+  estimatedHours  Decimal? @db.Decimal(10,2)
+  actualHours     Decimal? @db.Decimal(10,2)
+  progressPercent Int      @default(0)
+  startDate       DateTime?
+  endDate         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  resolvedAt      DateTime?
+  versions        WorkItemVersion[]
+  watchers        WorkItemWatcher[]
+  customFields    CustomFieldValue[]
+  linksFrom       WorkItemLink[] @relation("from")
+  linksTo         WorkItemLink[] @relation("to")
+  page            Page?
+  requirement     Requirement?
+  testCase        TestCase?
+  defect          Defect?
+  changeRequest   ChangeRequest?
+  comments        Comment[]
+  attachments     Attachment[]
+  testSuiteCases  TestSuiteCase[]
+  testResults     TestResult[]
+  defectResults   TestResult[] @relation("defectResult")
+  reviewFindings  ReviewFinding[] @relation("defectFinding")
+  sprintItems     SprintItem[]
+  backlogRanking  BacklogRanking?
+  baselineItems   BaselineItem[]
+  projectDeliverables ProjectDeliverable[]
+  evidenceLinks   EvidenceLink[]
+  workflowHistory WorkflowTransitionHistory[]
+  dependenciesFrom WorkItemDependency[] @relation("depFrom")
+  dependenciesTo   WorkItemDependency[] @relation("depTo")
+  traceLinksFrom   TraceLink[] @relation("traceFrom")
+  traceLinksTo     TraceLink[] @relation("traceTo")
+  testCoverageAsCase TestCoverage[] @relation("testCaseCoverage")
+  testCoverageAsReq  TestCoverage[] @relation("reqCoverage")
+  derivedRequirements Requirement[] @relation("derivedFrom")
+  @@unique([spaceId, key])
+  @@index([spaceId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([aspiceProcess])
+  @@map("work_items")
+}
+
+model WorkItemLink {
+  id          String   @id @default(uuid())
+  fromId      String
+  from        WorkItem @relation("from", fields: [fromId], references: [id], onDelete: Cascade)
+  toId        String
+  to          WorkItem @relation("to", fields: [toId], references: [id], onDelete: Cascade)
+  linkType    String
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  @@unique([fromId, toId, linkType])
+  @@index([fromId])
+  @@index([toId])
+  @@map("work_item_links")
+}
+
+model WorkItemVersion {
+  id            String   @id @default(uuid())
+  workItemId    String
+  workItem      WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  version       Int
+  title         String?
+  body          Json?
+  bodyText      String?
+  changedById   String?
+  changedBy     User?    @relation(fields: [changedById], references: [id])
+  changeSummary String?
+  createdAt     DateTime @default(now())
+  deliverableVersions DeliverableVersion[]
+  @@unique([workItemId, version])
+  @@index([workItemId])
+  @@map("work_item_versions")
+}
+
+model WorkItemWatcher {
+  workItemId String
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt    DateTime @default(now())
+  @@id([workItemId, userId])
+  @@map("work_item_watchers")
+}
+
+model CustomFieldDef {
+  id           String   @id @default(uuid())
+  spaceId      String
+  space        Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name         String
+  fieldType    String
+  options      Json     @default("[]")
+  required     Boolean  @default(false)
+  defaultValue Json?
+  createdAt    DateTime @default(now())
+  values       CustomFieldValue[]
+  @@unique([spaceId, name])
+  @@map("custom_field_defs")
+}
+
+model CustomFieldValue {
+  workItemId String
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  fieldId    String
+  field      CustomFieldDef @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value      Json?
+  @@id([workItemId, fieldId])
+  @@map("custom_field_values")
+}
+
+model WorkItemDependency {
+  id             String   @id @default(uuid())
+  fromItemId     String
+  fromItem       WorkItem @relation("depFrom", fields: [fromItemId], references: [id], onDelete: Cascade)
+  toItemId       String
+  toItem         WorkItem @relation("depTo", fields: [toItemId], references: [id], onDelete: Cascade)
+  dependencyType String
+  lagDays        Int      @default(0)
+  createdAt      DateTime @default(now())
+  @@unique([fromItemId, toItemId])
+  @@map("work_item_dependencies")
+}
+
+// ═══════════════════════════════════════════
+// 04. Documents
+// ═══════════════════════════════════════════
+
+model Page {
+  workItemId    String   @id
+  workItem      WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  parentPageId  String?
+  parentPage    WorkItem? @relation("pageParent", fields: [parentPageId], references: [id])
+  childPages    Page[]   @relation("pageParent")
+  templateId    String?
+  template      PageTemplate? @relation(fields: [templateId], references: [id])
+  position      Int      @default(0)
+  isHomepage    Boolean  @default(false)
+  viewCount     Int      @default(0)
+  lastViewedAt  DateTime?
+  @@map("pages")
+}
+
+model PageTemplate {
+  id             String   @id @default(uuid())
+  spaceId        String?
+  space          Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  body           Json?
+  category       String?
+  aspiceProcess  String?
+  isSystem       Boolean  @default(false)
+  createdById    String?
+  createdBy      User?    @relation(fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+  pages          Page[]
+  aspiceDeliverables AspiceDeliverable[]
+  @@map("page_templates")
+}
+
+model Comment {
+  id            String   @id @default(uuid())
+  targetType    String
+  targetId      String
+  parentId      String?
+  parent        Comment? @relation("thread", fields: [parentId], references: [id])
+  replies       Comment[] @relation("thread")
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id])
+  body          String
+  bodyHtml      String?
+  anchor        Json?
+  isInline      Boolean  @default(false)
+  isResolved    Boolean  @default(false)
+  resolvedById  String?
+  resolvedBy    User?    @relation("resolver", fields: [resolvedById], references: [id])
+  resolvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  reactions     CommentReaction[]
+  @@index([targetType, targetId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model CommentReaction {
+  commentId String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+  @@id([commentId, userId, emoji])
+  @@map("comment_reactions")
+}
+
+model Attachment {
+  id            String   @id @default(uuid())
+  targetType    String
+  targetId      String
+  fileName      String
+  filePath      String
+  fileSize      BigInt?
+  mimeType      String?
+  thumbnailPath String?
+  uploadedById  String
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id])
+  uploadedAt    DateTime @default(now())
+  isDeleted     Boolean  @default(false)
+  @@index([targetType, targetId])
+  @@map("attachments")
+}
+
+model Favorite {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetType String
+  targetId   String
+  createdAt  DateTime @default(now())
+  @@id([userId, targetType, targetId])
+  @@map("favorites")
+}
+
+// ═══════════════════════════════════════════
+// 05. Requirements
+// ═══════════════════════════════════════════
+
+model Requirement {
+  workItemId         String   @id
+  workItem           WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  reqType            String
+  asilLevel          String?
+  safetyRelated      Boolean  @default(false)
+  rationale          String?
+  acceptanceCriteria String?
+  verificationMethod String?
+  derivedFromId      String?
+  derivedFrom        WorkItem? @relation("derivedFrom", fields: [derivedFromId], references: [id])
+  reviewStatus       String   @default("draft")
+  approvedById       String?
+  approvedBy         User?    @relation(fields: [approvedById], references: [id])
+  approvedAt         DateTime?
+  baselineId         String?
+  baseline           Baseline? @relation(fields: [baselineId], references: [id])
+  externalId         String?
+  externalSource     String?
+  attributes         RequirementAttribute[]
+  relationsFrom      RequirementRelation[] @relation("fromReq")
+  relationsTo        RequirementRelation[] @relation("toReq")
+  changeHistory      RequirementChangeHistory[]
+  @@map("requirements")
+}
+
+model RequirementAttribute {
+  requirementId String
+  requirement   Requirement @relation(fields: [requirementId], references: [workItemId], onDelete: Cascade)
+  attrKey       String
+  attrValue     String?
+  @@id([requirementId, attrKey])
+  @@map("requirement_attributes")
+}
+
+model RequirementRelation {
+  id           String   @id @default(uuid())
+  fromReqId    String
+  fromReq      WorkItem @relation("fromReq", fields: [fromReqId], references: [id], onDelete: Cascade)
+  toReqId      String
+  toReq        WorkItem @relation("toReq", fields: [toReqId], references: [id], onDelete: Cascade)
+  relationType String
+  createdById  String?
+  createdBy    User?    @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  @@unique([fromReqId, toReqId, relationType])
+  @@map("requirement_relations")
+}
+
+model RequirementChangeHistory {
+  id             String   @id @default(uuid())
+  requirementId  String
+  requirement    WorkItem @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  versionFrom    Int
+  versionTo      Int
+  changedFields  Json?
+  changedById    String?
+  changedBy      User?    @relation(fields: [changedById], references: [id])
+  changedAt      DateTime @default(now())
+  @@map("requirement_change_history")
+}
+
+// ═══════════════════════════════════════════
+// 06. Tests
+// ═══════════════════════════════════════════
+
+model TestCase {
+  workItemId          String   @id
+  workItem            WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  testType            String
+  preconditions       String?
+  postconditions      String?
+  steps               Json     @default("[]")
+  isAutomated         Boolean  @default(false)
+  automationFramework String?
+  automationScriptPath String?
+  testEnvironment     String?
+  estimatedDuration   Int?
+  createdAt           DateTime @default(now())
+  @@map("test_cases")
+}
+
+model TestSuite {
+  id          String   @id @default(uuid())
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  parentId    String?
+  parent      TestSuite? @relation("suiteParent", fields: [parentId], references: [id])
+  children    TestSuite[] @relation("suiteParent")
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  cases       TestSuiteCase[]
+  testRuns    TestRun[]
+  @@map("test_suites")
+}
+
+model TestSuiteCase {
+  suiteId    String
+  suite      TestSuite @relation(fields: [suiteId], references: [id], onDelete: Cascade)
+  testCaseId String
+  testCase   WorkItem  @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  position   Int      @default(0)
+  @@id([suiteId, testCaseId])
+  @@map("test_suite_cases")
+}
+
+model TestRun {
+  id           String   @id @default(uuid())
+  spaceId      String
+  space        Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  testSuiteId  String?
+  testSuite    TestSuite? @relation(fields: [testSuiteId], references: [id])
+  environment  String?
+  buildVersion String?
+  baselineId   String?
+  baseline     Baseline? @relation(fields: [baselineId], references: [id])
+  status       String   @default("planned")
+  assignedToId String?
+  assignedTo   User?    @relation(fields: [assignedToId], references: [id])
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdById  String?
+  createdBy    User?    @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  results      TestResult[]
+  @@index([spaceId])
+  @@index([status])
+  @@map("test_runs")
+}
+
+model TestResult {
+  id               String   @id @default(uuid())
+  testRunId        String
+  testRun          TestRun  @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  testCaseId       String
+  testCase         WorkItem @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  result           String
+  actualResult     String?
+  evidence         Json     @default("[]")
+  executedById     String?
+  executedBy       User?    @relation(fields: [executedById], references: [id])
+  executedAt       DateTime @default(now())
+  durationMs       Int?
+  defectId         String?
+  defect           WorkItem? @relation("defectResult", fields: [defectId], references: [id])
+  retryCount       Int      @default(0)
+  previousResultId String?
+  previousResult   TestResult? @relation("retry", fields: [previousResultId], references: [id])
+  retries          TestResult[] @relation("retry")
+  @@unique([testRunId, testCaseId])
+  @@index([testRunId])
+  @@index([testCaseId])
+  @@map("test_results")
+}
+
+model TestCoverage {
+  testCaseId     String
+  testCase       WorkItem @relation("testCaseCoverage", fields: [testCaseId], references: [id], onDelete: Cascade)
+  requirementId  String
+  requirement    WorkItem @relation("reqCoverage", fields: [requirementId], references: [id], onDelete: Cascade)
+  coverageType   String   @default("verifies")
+  createdAt      DateTime @default(now())
+  @@id([testCaseId, requirementId])
+  @@map("test_coverage")
+}
+
+model Defect {
+  workItemId         String   @id
+  workItem           WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  severity           String
+  defectType         String?
+  foundInVersion     String?
+  foundInEnvironment String?
+  fixedInVersion     String?
+  rootCause          String?
+  reproductionSteps  String?
+  timeToFixHours     Decimal? @db.Decimal(10,2)
+  safetyImpact       Boolean  @default(false)
+  asilLevel          String?
+  @@map("defects")
+}
+
+// ═══════════════════════════════════════════
+// 07. Traceability
+// ═══════════════════════════════════════════
+
+model TraceLink {
+  id          String   @id @default(uuid())
+  fromType    String
+  fromId      String
+  fromItem    WorkItem? @relation("traceFrom", fields: [fromId], references: [id])
+  toType      String
+  toId        String
+  toItem      WorkItem? @relation("traceTo", fields: [toId], references: [id])
+  linkType    String
+  description String?
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  baselineId  String?
+  baseline    Baseline? @relation(fields: [baselineId], references: [id])
+  isSuspect   Boolean  @default(false)
+  suspectLinks SuspectLink[]
+  @@unique([fromType, fromId, toType, toId, linkType])
+  @@index([fromType, fromId])
+  @@index([toType, toId])
+  @@index([isSuspect])
+  @@map("trace_links")
+}
+
+model SuspectLink {
+  id           String   @id @default(uuid())
+  traceLinkId  String
+  traceLink    TraceLink @relation(fields: [traceLinkId], references: [id], onDelete: Cascade)
+  reason       String?
+  markedAt     DateTime @default(now())
+  markedById   String?
+  markedBy     User?    @relation("markedBy", fields: [markedById], references: [id])
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?    @relation("resolvedBy", fields: [resolvedById], references: [id])
+  resolution   String?
+  @@map("suspect_links")
+}
+
+model TraceMatrixSnapshot {
+  id                  String   @id @default(uuid())
+  spaceId             String
+  space               Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  baselineId          String?
+  baseline            Baseline? @relation(fields: [baselineId], references: [id])
+  name                String
+  matrixData          Json
+  totalRequirements   Int      @default(0)
+  coveredRequirements Int      @default(0)
+  coveragePercent     Decimal  @default(0) @db.Decimal(5,2)
+  generatedById       String?
+  generatedBy         User?    @relation(fields: [generatedById], references: [id])
+  generatedAt         DateTime @default(now())
+  @@map("trace_matrix_snapshots")
+}
+
+model CoverageReport {
+  id              String   @id @default(uuid())
+  spaceId         String
+  space           Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  baselineId      String?
+  baseline        Baseline? @relation(fields: [baselineId], references: [id])
+  reportType      String
+  totalItems      Int
+  coveredItems    Int
+  coveragePercent Decimal  @db.Decimal(5,2)
+  uncoveredItems  Json     @default("[]")
+  generatedById   String?
+  generatedBy     User?    @relation(fields: [generatedById], references: [id])
+  generatedAt     DateTime @default(now())
+  @@map("coverage_reports")
+}
+
+// ═══════════════════════════════════════════
+// 08. Config (베이스라인, 변경관리)
+// ═══════════════════════════════════════════
+
+model Baseline {
+  id            String   @id @default(uuid())
+  spaceId       String
+  space         Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  version       String?
+  baselineType  String   @default("release")
+  status        String   @default("draft")
+  snapshotData  Json?
+  approvedById  String?
+  approvedBy    User?    @relation(fields: [approvedById], references: [id])
+  approvedAt    DateTime?
+  releasedAt    DateTime?
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  items         BaselineItem[]
+  traceLinks    TraceLink[]
+  snapshots     TraceMatrixSnapshot[]
+  coverageReports CoverageReport[]
+  testRuns      TestRun[]
+  requirements  Requirement[]
+  deliverableVersions DeliverableVersion[]
+  changeBaselineImpacts ChangeBaselineImpact[]
+  @@unique([spaceId, name])
+  @@index([spaceId])
+  @@index([status])
+  @@map("baselines")
+}
+
+model BaselineItem {
+  baselineId   String
+  baseline     Baseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+  itemType     String
+  itemId       String
+  itemVersion  Int?
+  @@id([baselineId, itemType, itemId])
+  @@map("baseline_items")
+}
+
+model ConfigurationItem {
+  id             String   @id @default(uuid())
+  spaceId        String
+  space          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  ciType         String
+  name           String
+  description    String?
+  location       String?
+  currentVersion String?
+  status         String   @default("active")
+  linkedWorkItems String[]
+  ownerId        String?
+  owner          User?    @relation(fields: [ownerId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@map("configuration_items")
+}
+
+model ChangeRequest {
+  workItemId     String   @id
+  workItem       WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  crType         String   @default("standard")
+  impactAnalysis String?
+  affectedItems  String[]
+  estimatedEffort Int?
+  urgency        String   @default("medium")
+  approvalStatus String   @default("pending")
+  createdAt      DateTime @default(now())
+  baselineImpacts ChangeBaselineImpact[]
+  @@map("change_requests")
+}
+
+model ChangeBaselineImpact {
+  changeRequestId String
+  changeRequest   ChangeRequest @relation(fields: [changeRequestId], references: [workItemId], onDelete: Cascade)
+  baselineId      String
+  baseline        Baseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+  impactLevel     String   @default("medium")
+  @@id([changeRequestId, baselineId])
+  @@map("change_baseline_impact")
+}
+
+model Release {
+  id          String   @id @default(uuid())
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  version     String?
+  releaseDate DateTime?
+  status      String   @default("planned")
+  baselineId  String?
+  baseline    Baseline? @relation(fields: [baselineId], references: [id])
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  @@unique([spaceId, name])
+  @@map("releases")
+}
+
+// ═══════════════════════════════════════════
+// 09. Workflow
+// ═══════════════════════════════════════════
+
+model Workflow {
+  id            String   @id @default(uuid())
+  spaceId       String?
+  space         Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  aspiceProcess String?
+  isDefault     Boolean  @default(false)
+  isSystem      Boolean  @default(false)
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  states        WorkflowState[]
+  transitions   WorkflowTransition[]
+  workItems     WorkItem[]
+  spaces        Space[]
+  @@map("workflows")
+}
+
+model WorkflowState {
+  id          String   @id @default(uuid())
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  category    String
+  color       String   @default("#6B7280")
+  position    Int      @default(0)
+  isInitial   Boolean  @default(false)
+  isTerminal  Boolean  @default(false)
+  workItems   WorkItem[]
+  transitionsFrom WorkflowTransition[] @relation("fromState")
+  transitionsTo   WorkflowTransition[] @relation("toState")
+  historyFrom WorkflowTransitionHistory[] @relation("histFrom")
+  historyTo   WorkflowTransitionHistory[] @relation("histTo")
+  @@unique([workflowId, name])
+  @@index([workflowId])
+  @@map("workflow_states")
+}
+
+model WorkflowTransition {
+  id             String   @id @default(uuid())
+  workflowId     String
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  name           String
+  fromStateId    String?
+  fromState      WorkflowState? @relation("fromState", fields: [fromStateId], references: [id])
+  toStateId      String
+  toState        WorkflowState @relation("toState", fields: [toStateId], references: [id])
+  conditionType  String?
+  conditionConfig Json    @default("{}")
+  postActions    Json     @default("[]")
+  isGlobal       Boolean  @default(false)
+  position       Int      @default(0)
+  history        WorkflowTransitionHistory[]
+  @@unique([workflowId, fromStateId, toStateId])
+  @@index([workflowId])
+  @@map("workflow_transitions")
+}
+
+model WorkflowTransitionHistory {
+  id            String   @id @default(uuid())
+  workItemId    String
+  workItem      WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  transitionId  String?
+  transition    WorkflowTransition? @relation(fields: [transitionId], references: [id])
+  fromStateId   String?
+  fromState     WorkflowState? @relation("histFrom", fields: [fromStateId], references: [id])
+  toStateId     String?
+  toState       WorkflowState? @relation("histTo", fields: [toStateId], references: [id])
+  performedById String?
+  performedBy   User?    @relation(fields: [performedById], references: [id])
+  comment       String?
+  performedAt   DateTime @default(now())
+  @@index([workItemId])
+  @@map("workflow_transition_history")
+}
+
+model Review {
+  id            String   @id @default(uuid())
+  spaceId       String
+  space         Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  reviewType    String
+  targetType    String
+  targetId      String
+  status        String   @default("pending")
+  moderatorId   String?
+  moderator     User?    @relation(fields: [moderatorId], references: [id])
+  aspiceProcess String?
+  dueDate       DateTime?
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+  participants  ReviewParticipant[]
+  findings      ReviewFinding[]
+  @@map("reviews")
+}
+
+model ReviewParticipant {
+  reviewId   String
+  review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       String   @default("reviewer")
+  status     String   @default("pending")
+  decisionAt DateTime?
+  comment    String?
+  @@id([reviewId, userId])
+  @@map("review_participants")
+}
+
+model ReviewFinding {
+  id          String   @id @default(uuid())
+  reviewId    String
+  review      Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  severity    String   @default("minor")
+  status      String   @default("open")
+  location    Json?
+  defectId    String?
+  defect      WorkItem? @relation("defectFinding", fields: [defectId], references: [id])
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+  @@map("review_findings")
+}
+
+model Approval {
+  id              String   @id @default(uuid())
+  entityType      String
+  entityId        String
+  approverId      String
+  approver        User     @relation(fields: [approverId], references: [id])
+  decision        String
+  comment         String?
+  signature       String?
+  signatureMethod String?
+  decidedAt       DateTime @default(now())
+  @@unique([entityType, entityId, approverId])
+  @@index([entityType, entityId])
+  @@map("approvals")
+}
+
+model ElectronicSignature {
+  id             String   @id @default(uuid())
+  entityType     String
+  entityId       String
+  signerId       String
+  signer         User     @relation(fields: [signerId], references: [id])
+  signatureType  String
+  signatureData  String
+  signedAt       DateTime @default(now())
+  ipAddress      String?
+  isEvidence     Boolean  @default(true)
+  evidenceTag    String?
+  comment        String?
+  @@unique([entityType, entityId, signerId])
+  @@map("electronic_signatures")
+}
+
+// ═══════════════════════════════════════════
+// 10. Audit
+// ═══════════════════════════════════════════
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  entityType     String
+  entityId       String
+  action         String
+  fieldName      String?
+  oldValue       Json?
+  newValue       Json?
+  diff           Json?
+  actorId        String?
+  actor          User?    @relation(fields: [actorId], references: [id])
+  actorIp        String?
+  actorUserAgent String?
+  sessionId      String?
+  isEvidence     Boolean  @default(false)
+  evidenceTag    String?
+  createdAt      DateTime @default(now())
+  evidenceLinks  EvidenceLink[]
+  complianceChecklists ComplianceChecklist[]
+  ndaSignatures  NdaSignature[]
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([isEvidence])
+  @@map("audit_logs")
+}
+
+model EvidenceLink {
+  id            String   @id @default(uuid())
+  auditLogId    String
+  auditLog      AuditLog @relation(fields: [auditLogId], references: [id], onDelete: Cascade)
+  aspiceProcess String
+  aspiceClause  String?
+  workItemId    String?
+  workItem      WorkItem? @relation(fields: [workItemId], references: [id])
+  description   String?
+  createdAt     DateTime @default(now())
+  @@index([aspiceProcess])
+  @@map("evidence_links")
+}
+
+model ActivityFeed {
+  id          String   @id @default(uuid())
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actor       User?    @relation(fields: [actorId], references: [id])
+  action      String
+  targetType  String
+  targetId    String
+  targetTitle String?
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  @@index([spaceId, createdAt(sort: Desc)])
+  @@map("activity_feed")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String
+  title      String
+  body       String?
+  targetType String?
+  targetId   String?
+  isRead     Boolean  @default(false)
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  userId           String
+  user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationType String
+  channel          String @default("in_app")
+  enabled          Boolean @default(true)
+  @@id([userId, notificationType, channel])
+  @@map("notification_preferences")
+}
+
+// ═══════════════════════════════════════════
+// 11. Process (ASPICE)
+// ═══════════════════════════════════════════
+
+model ProcessArea {
+  id                   String   @id @default(uuid())
+  code                 String   @unique
+  name                 String
+  category             String
+  description          String?
+  level                Int
+  parentCode           String?
+  requiredWorkProducts String[]
+  sortOrder            Int      @default(0)
+  spaceProcessAreas    SpaceProcessArea[]
+  deliverables         AspiceDeliverable[]
+  assessments          ProcessAssessment[]
+  checklists           ComplianceChecklist[]
+  @@map("process_areas")
+}
+
+model SpaceProcessArea {
+  spaceId      String
+  space        Space        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  processCode  String
+  processArea  ProcessArea  @relation(fields: [processCode], references: [code])
+  isApplicable Boolean      @default(true)
+  notes        String?
+  @@id([spaceId, processCode])
+  @@map("space_process_areas")
+}
+
+model AspiceDeliverable {
+  id          String   @id @default(uuid())
+  processCode String
+  processArea ProcessArea @relation(fields: [processCode], references: [code])
+  name        String
+  shortName   String?
+  description String?
+  isMandatory Boolean  @default(true)
+  templateId  String?
+  template    PageTemplate? @relation(fields: [templateId], references: [id])
+  sortOrder   Int      @default(0)
+  projectDeliverables ProjectDeliverable[]
+  @@map("aspice_deliverables")
+}
+
+model ProjectDeliverable {
+  id             String   @id @default(uuid())
+  spaceId        String
+  space          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  deliverableId  String
+  deliverable    AspiceDeliverable @relation(fields: [deliverableId], references: [id])
+  workItemId     String?
+  workItem       WorkItem? @relation(fields: [workItemId], references: [id])
+  status         String   @default("not_started")
+  assignedToId   String?
+  assignedTo     User?    @relation(fields: [assignedToId], references: [id])
+  dueDate        DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  versions       DeliverableVersion[]
+  @@unique([spaceId, deliverableId])
+  @@map("project_deliverables")
+}
+
+model DeliverableVersion {
+  id                    String   @id @default(uuid())
+  projectDeliverableId  String
+  projectDeliverable    ProjectDeliverable @relation(fields: [projectDeliverableId], references: [id], onDelete: Cascade)
+  workItemVersionId     String?
+  workItemVersion       WorkItemVersion? @relation(fields: [workItemVersionId], references: [id])
+  baselineId            String?
+  baseline              Baseline? @relation(fields: [baselineId], references: [id])
+  versionLabel          String?
+  isReleased            Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  @@map("deliverable_versions")
+}
+
+model ProcessAssessment {
+  id             String   @id @default(uuid())
+  spaceId        String
+  space          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  processCode    String
+  processArea    ProcessArea @relation(fields: [processCode], references: [code])
+  capabilityLevel Int
+  assessmentDate DateTime
+  assessorId     String?
+  assessor       User?    @relation(fields: [assessorId], references: [id])
+  evidenceItems  String[]
+  notes          String?
+  createdAt      DateTime @default(now())
+  @@map("process_assessments")
+}
+
+model ComplianceChecklist {
+  id          String   @id @default(uuid())
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  processCode String
+  processArea ProcessArea @relation(fields: [processCode], references: [code])
+  itemName    String
+  description String?
+  isRequired  Boolean  @default(true)
+  status      String   @default("not_started")
+  evidenceId  String?
+  evidence    AuditLog? @relation(fields: [evidenceId], references: [id])
+  assignedToId String?
+  assignedTo  User?    @relation(fields: [assignedToId], references: [id])
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  @@index([spaceId])
+  @@index([processCode])
+  @@map("compliance_checklists")
+}
+
+// ═══════════════════════════════════════════
+// 12. Agile
+// ═══════════════════════════════════════════
+
+model Board {
+  id           String   @id @default(uuid())
+  spaceId      String
+  space        Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name         String
+  boardType    String
+  filterJql    String?
+  columnConfig Json     @default("{}")
+  settings     Json     @default("{}")
+  createdById  String?
+  createdBy    User?    @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  sprints      Sprint[]
+  @@map("boards")
+}
+
+model Sprint {
+  id          String   @id @default(uuid())
+  boardId     String
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  name        String
+  goal        String?
+  state       String   @default("future")
+  startDate   DateTime?
+  endDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  items       SprintItem[]
+  @@map("sprints")
+}
+
+model SprintItem {
+  sprintId    String
+  sprint      Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  workItemId  String
+  workItem    WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  addedAt     DateTime @default(now())
+  addedById   String?
+  addedBy     User?    @relation("addedBy", fields: [addedById], references: [id])
+  @@id([sprintId, workItemId])
+  @@map("sprint_items")
+}
+
+model BacklogRanking {
+  workItemId String   @id
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  spaceId    String
+  space      Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  rank       String
+  updatedAt  DateTime @updatedAt
+  @@index([spaceId, rank])
+  @@map("backlog_ranking")
+}
+
+// ═══════════════════════════════════════════
+// Stakeholders, Invitations, NDA
+// ═══════════════════════════════════════════
+
+model StakeholderType {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  isInternal  Boolean  @default(false)
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  profiles    UserStakeholderProfile[]
+  policies    StakeholderAccessPolicy[]
+  spaceAccess SpaceStakeholderAccess[]
+  invitations Invitation[]
+  @@map("stakeholder_types")
+}
+
+model ExternalOrganization {
+  id            String   @id @default(uuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name          String
+  orgType       String
+  domain        String?
+  contactEmail  String?
+  contactPhone  String?
+  address       String?
+  hasNda        Boolean  @default(false)
+  ndaSignedAt   DateTime?
+  ndaDocumentId String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  profiles      UserStakeholderProfile[]
+  spaceAccess   SpaceStakeholderAccess[]
+  ndaSignatures NdaSignature[]
+  @@map("external_organizations")
+}
+
+model UserStakeholderProfile {
+  userId            String   @id
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stakeholderTypeId String
+  stakeholderType   StakeholderType @relation(fields: [stakeholderTypeId], references: [id])
+  externalOrgId     String?
+  externalOrg       ExternalOrganization? @relation(fields: [externalOrgId], references: [id])
+  contractStart     DateTime?
+  contractEnd       DateTime?
+  isTemporary       Boolean  @default(false)
+  allowedSpaces     String[]
+  restrictedSpaces  String[]
+  createdAt         DateTime @default(now())
+  @@map("user_stakeholder_profiles")
+}
+
+model StakeholderAccessPolicy {
+  id                       String   @id @default(uuid())
+  stakeholderTypeId        String
+  stakeholderType          StakeholderType @relation(fields: [stakeholderTypeId], references: [id])
+  orgId                    String?
+  org                      Organization? @relation(fields: [orgId], references: [id])
+  scope                    String
+  allowedActions           String[]
+  deniedActions            String[]
+  dataFilter               Json     @default("{}")
+  documentAccess           String   @default("released_only")
+  requireNda               Boolean  @default(false)
+  requireApprovalForAccess Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  @@unique([stakeholderTypeId, orgId])
+  @@map("stakeholder_access_policies")
+}
+
+model SpaceStakeholderAccess {
+  id                   String   @id @default(uuid())
+  spaceId              String
+  space                Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  stakeholderTypeId    String
+  stakeholderType      StakeholderType @relation(fields: [stakeholderTypeId], references: [id])
+  externalOrgId        String?
+  externalOrg          ExternalOrganization? @relation(fields: [externalOrgId], references: [id])
+  allowedWorkItemTypes String[]
+  allowedStatuses      String[]
+  allowedLabels        String[]
+  deniedLabels         String[]
+  dataFilter           Json     @default("{}")
+  accessStart          DateTime @default(now())
+  accessEnd            DateTime?
+  grantedById          String?
+  grantedBy            User?    @relation(fields: [grantedById], references: [id])
+  grantedAt            DateTime @default(now())
+  isActive             Boolean  @default(true)
+  @@unique([spaceId, stakeholderTypeId, externalOrgId])
+  @@map("space_stakeholder_access")
+}
+
+model Invitation {
+  id                String   @id @default(uuid())
+  orgId             String
+  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email             String
+  stakeholderTypeId String?
+  stakeholderType   StakeholderType? @relation(fields: [stakeholderTypeId], references: [id])
+  externalOrgId     String?
+  externalOrg       ExternalOrganization? @relation(fields: [externalOrgId], references: [id])
+  allowedSpaces     String[]
+  dataFilter        Json     @default("{}")
+  contractEnd       DateTime?
+  token             String   @unique
+  expiresAt         DateTime
+  status            String   @default("pending")
+  invitedById       String?
+  invitedBy         User?    @relation("invitedBy", fields: [invitedById], references: [id])
+  acceptedById      String?
+  acceptedBy        User?    @relation("acceptedBy", fields: [acceptedById], references: [id])
+  acceptedAt        DateTime?
+  createdAt         DateTime @default(now())
+  @@index([token])
+  @@index([email])
+  @@index([status])
+  @@map("invitations")
+}
+
+model RegistrationRequest {
+  id                    String   @id @default(uuid())
+  orgId                 String
+  org                   Organization @relation(fields: [orgId], references: [id])
+  email                 String
+  displayName           String
+  requestedRole         String?
+  reason                String?
+  verificationToken     String?  @unique
+  verificationExpiresAt DateTime?
+  isEmailVerified       Boolean  @default(false)
+  status                String   @default("pending")
+  reviewedById          String?
+  reviewedBy            User?    @relation("reviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt            DateTime?
+  reviewComment         String?
+  ipAddress             String?
+  userAgent             String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  @@map("registration_requests")
+}
+
+model ApprovalAuditLog {
+  id            String   @id @default(uuid())
+  action        String
+  targetUserId  String
+  targetUser    User     @relation("targetUser", fields: [targetUserId], references: [id])
+  performedById String
+  performedBy   User     @relation("performer", fields: [performedById], references: [id])
+  oldStatus     String?
+  newStatus     String?
+  roleId        String?
+  role          Role?    @relation(fields: [roleId], references: [id])
+  comment       String?
+  ipAddress     String?
+  createdAt     DateTime @default(now())
+  @@map("approval_audit_log")
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  orgId       String?
+  org         Organization? @relation(fields: [orgId], references: [id])
+  key         String
+  value       Json
+  description String?
+  updatedById String?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
+  updatedAt   DateTime @default(now())
+  @@unique([orgId, key])
+  @@map("system_settings")
+}
+
+model SystemAuditLog {
+  id          String   @id @default(uuid())
+  orgId       String?
+  org         Organization? @relation(fields: [orgId], references: [id])
+  action      String
+  entityType  String
+  entityId    String?
+  actorId     String?
+  actor       User?    @relation(fields: [actorId], references: [id])
+  actorIp     String?
+  details     Json     @default("{}")
+  createdAt   DateTime @default(now())
+  @@map("system_audit_log")
+}
+
+model ApiKey {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name       String
+  keyHash    String   @unique
+  keyPrefix  String
+  scopes     String[]
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  @@index([userId])
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+model McpSession {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionToken     String   @unique
+  clientName       String?
+  clientVersion    String?
+  ipAddress        String?
+  connectedAt      DateTime @default(now())
+  lastActivityAt   DateTime @default(now())
+  disconnectedAt   DateTime?
+  @@map("mcp_sessions")
+}
+
+model Webhook {
+  id          String   @id @default(uuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  spaceId     String?
+  space       Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name        String
+  url         String
+  secret      String?
+  events      String[]
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  deliveries  WebhookDelivery[]
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id             String   @id @default(uuid())
+  webhookId      String
+  webhook        Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  eventType      String
+  payload        Json
+  responseStatus Int?
+  responseBody   String?
+  deliveredAt    DateTime?
+  retryCount     Int      @default(0)
+  nextRetryAt    DateTime?
+  status         String   @default("pending")
+  createdAt      DateTime @default(now())
+  @@map("webhook_deliveries")
+}
+
+model NdaDocument {
+  id            String   @id @default(uuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  title         String
+  version       String
+  content       String
+  effectiveDate DateTime?
+  expiryDate    DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  signatures    NdaSignature[]
+  @@map("nda_documents")
+}
+
+model NdaSignature {
+  id             String   @id @default(uuid())
+  ndaDocumentId  String
+  ndaDocument    NdaDocument @relation(fields: [ndaDocumentId], references: [id])
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalOrgId  String?
+  externalOrg    ExternalOrganization? @relation(fields: [externalOrgId], references: [id])
+  signature      String
+  signatureMethod String
+  ipAddress      String?
+  signedAt       DateTime @default(now())
+  auditLogId     String?
+  auditLog       AuditLog? @relation(fields: [auditLogId], references: [id])
+  @@unique([ndaDocumentId, userId])
+  @@map("nda_signatures")
+}
+
+model UrlSlug {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  slug       String
+  isPrimary  Boolean  @default(true)
+  redirectTo String?
+  createdAt  DateTime @default(now())
+  @@unique([entityType, slug])
+  @@index([entityType, entityId])
+  @@map("url_slugs")
+}
+
+model UrlAccessLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  url         String
+  spaceKey    String?
+  entityType  String?
+  entityId    String?
+  ipAddress   String?
+  userAgent   String?
+  accessedAt  DateTime @default(now())
+  @@index([spaceKey, accessedAt(sort: Desc)])
+  @@map("url_access_log")
+}
+
+model SpaceDailyMetric {
+  spaceId              String
+  space                Space   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  metricDate           DateTime @db.Date
+  totalItems           Int     @default(0)
+  openItems            Int     @default(0)
+  inProgressItems      Int     @default(0)
+  doneItems            Int     @default(0)
+  openDefects          Int     @default(0)
+  criticalDefects      Int     @default(0)
+  traceCoveragePercent Decimal @default(0) @db.Decimal(5,2)
+  suspectLinksCount    Int     @default(0)
+  testPassRate         Decimal @default(0) @db.Decimal(5,2)
+  testExecutionCount   Int     @default(0)
+  @@id([spaceId, metricDate])
+  @@map("space_daily_metrics")
+}
+
+model ProjectTemplate {
+  id                    String   @id @default(uuid())
+  name                  String
+  description           String?
+  aspiceLevel           String
+  automotiveDomain      String?
+  processCodes          String[]
+  workflowTemplateIds   String[]
+  pageTemplateIds       String[]
+  defaultRoles          Json     @default("[]")
+  isSystem              Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  spaces                SpaceTemplateApplied[]
+  @@map("project_templates")
+}
+
+model SpaceTemplateApplied {
+  spaceId     String
+  space       Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    ProjectTemplate @relation(fields: [templateId], references: [id])
+  appliedAt   DateTime        @default(now())
+  appliedById String?
+  appliedBy   User?           @relation(fields: [appliedById], references: [id])
+  @@id([spaceId, templateId])
+  @@map("space_template_applied")
+}
+
+model SharedComponent {
+  id            String   @id @default(uuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  componentType String?
+  version       String?
+  ownerSpaceId  String?
+  ownerSpace    Space?   @relation(fields: [ownerSpaceId], references: [id])
+  createdAt     DateTime @default(now())
+  usages        ComponentUsage[]
+  @@map("shared_components")
+}
+
+model ComponentUsage {
+  componentId String
+  component   SharedComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  spaceId     String
+  space       Space          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  usedVersion String?
+  addedAt     DateTime       @default(now())
+  @@id([componentId, spaceId])
+  @@map("component_usage")
+}
+
+model RoleResponsibility {
+  id             String   @id @default(uuid())
+  roleId         String
+  role           Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  spaceId        String
+  space          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  aspiceProcess  String?
+  responsibility String
+  isPrimary      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  @@unique([roleId, spaceId, aspiceProcess])
+  @@map("role_responsibilities")
+}
+
+model CrossProjectLink {
+  id          String   @id @default(uuid())
+  fromSpaceId String
+  fromSpace   Space    @relation("fromSpace", fields: [fromSpaceId], references: [id], onDelete: Cascade)
+  fromType    String
+  fromId      String
+  toSpaceId   String
+  toSpace     Space    @relation("toSpace", fields: [toSpaceId], references: [id], onDelete: Cascade)
+  toType      String
+  toId        String
+  linkType    String
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  @@map("cross_project_links")
+}
+```
 
 ---
 
-## Module: Spaces (프로젝트)
+## 2. 모듈별 구현 명세 (Just Enough)
 
-### Requirements
-- FR-SPACE-001: 프로젝트 생성 (이름, 키, 템플릿)
-- FR-SPACE-002: 자동 프로비저닝 (워크플로우, 템플릿, 역할, 홈 페이지)
-- FR-SPACE-003: 프로젝트 목록/상세 조회
-- FR-SPACE-004: 프로젝트 수정/삭제/아카이브
-- FR-SPACE-005: 멤버 추가/제거/역할 변경
-- FR-SPACE-006: 프로젝트 설정 (워크플로우, 템플릿, 알림, ASPICE)
+### Module: Spaces
+- **FR**: FR-SPACE-001~006
+- **API**: GET/POST/PUT/DELETE /spaces, GET/POST/DELETE /spaces/:key/members, GET/PUT /spaces/:key/settings
+- **Model**: Space, SpaceMember, SpaceSettings, Component, Label, Version
+- **Rules**: 키 2~10자 영문대문자+숫자, 고유. 생성 시 자동 프로비저닝 (SpaceProcessArea, Workflow×6, PageTemplate×5, Role×6, HomePage, SpaceSettings). 멤버 추가 시 audit log. 아카이브 시 수정 불가.
+- **Deps**: PrismaService, AuthService, AuditService, TemplateService
+- **AC**: [ ] 워크플로우 6개 자동 생성 [ ] 역할 6개 자동 생성 [ ] 멤버 추가 시 audit log [ ] 권한 없으면 403
 
-### API Contract
-```
-GET    /spaces                    → SpaceListResponse[]
-GET    /spaces/:key               → SpaceDetailResponse
-POST   /spaces                    → CreateSpaceDto → SpaceResponse
-PUT    /spaces/:key               → UpdateSpaceDto → SpaceResponse
-DELETE /spaces/:key               → 204
-GET    /spaces/:key/members       → SpaceMemberResponse[]
-POST   /spaces/:key/members       → AddMemberDto → SpaceMemberResponse
-DELETE /spaces/:key/members/:userId → 204
-GET    /spaces/:key/settings      → SpaceSettingsResponse
-PUT    /spaces/:key/settings      → UpdateSettingsDto → SpaceSettingsResponse
-```
+### Module: WorkItems
+- **FR**: FR-WI-001~008
+- **API**: GET/POST/PUT/DELETE /spaces/:key/issues, POST /spaces/:key/issues/:key/transitions, POST /spaces/:key/issues/:key/comments, POST /spaces/:key/issue-links
+- **Model**: WorkItem, WorkItemLink, WorkItemVersion, WorkItemWatcher, CustomFieldDef, CustomFieldValue, WorkItemDependency
+- **Rules**: 키 자동 생성 ({SPACE}-{순번}). 상태 전이 시 조건 체크. 전이 시 사후 액션. 수정 시 버전+Suspect Link. 삭제 시 cascade. Meilisearch 비동기 인덱싱.
+- **Deps**: PrismaService, SpaceService, WorkflowService, TraceabilityService, AuditService, SearchService, NotificationService
+- **AC**: [ ] 키 자동 생성 [ ] 조건 체크 [ ] 사후 액션 [ ] 버전 히스토리 [ ] Suspect Link [ ] cascade 삭제
 
-### Data Model
-```prisma
-model Space { id, orgId, key, name, description, spaceType, aspiceLevel, automotiveDomain, processProfile, isArchived, createdById, createdAt, updatedAt }
-model SpaceMember { spaceId, userId, roleId, addedById, addedAt }
-model SpaceSettings { spaceId, defaultPageTemplateId, allowAnonymousView, requireApprovalForRelease, minApprovers, autoSuspectLinks, requireTraceForRelease, notificationChannels, aspiceLevel, requireEvidenceForAll }
-model Component { id, spaceId, name, description, leadUserId, createdAt }
-model Label { id, spaceId, name, color }
-model Version { id, spaceId, name, description, releaseDate, status, createdAt }
-```
+### Module: Documents
+- **FR**: FR-DOC-001~010
+- **API**: GET/POST/PUT/DELETE /spaces/:key/docs, GET /spaces/:key/docs/:id/versions, GET/POST /spaces/:key/docs/:id/comments
+- **Model**: Page, PageTemplate, PageVersion, Comment, CommentReaction, Attachment, Favorite
+- **Rules**: WorkItem(type=page)으로 저장. 저장 시 버전 자동 생성. 수정 시 Suspect Link. 댓글 스레드. 인라인 댓글 (anchor). TOC 자동 생성. Mermaid 렌더링. 페이지 잠금.
+- **Deps**: PrismaService, WorkItemService, TraceabilityService, AuditService, UploadService
+- **AC**: [ ] TipTap 에디터 [ ] 버전 히스토리 [ ] Suspect Link [ ] 인라인 댓글 [ ] Mermaid [ ] TOC
 
-### Business Rules
-- 프로젝트 키: 2~10자 영문 대문자+숫자, 조직 내 고유
-- 생성 시 자동 프로비저닝: SpaceProcessArea(N개), Workflow(6개), PageTemplate(5개), Role(6개), HomePage(1개), SpaceSettings(1개)
-- 멤버 추가 시 permission_audit_log 기록
-- 아카이브된 프로젝트는 수정 불가 (400)
-- 프로젝트 삭제 시 cascade (WorkItems, SpaceMembers 등)
+### Module: Traceability
+- **FR**: FR-TRACE-001~006
+- **API**: GET /spaces/:key/trace, GET /spaces/:key/trace/coverage, GET /spaces/:key/trace/suspect, POST/DELETE /spaces/:key/trace/links, POST /spaces/:key/trace/suspect/:id/resolve
+- **Model**: TraceLink, SuspectLink, TraceMatrixSnapshot, CoverageReport
+- **Rules**: 양방향 링크 자동 생성. 링크 타입: verifies, satisfies, implements, tests, derives, refines, traces_to. 항목 수정 시 isSuspect=TRUE. 커버리지: (커버/전체)×100. Suspect 해결: verified, updated, waived.
+- **Deps**: PrismaService, WorkItemService, SpaceService, AuditService, NotificationService
+- **AC**: [ ] 양방향 링크 [ ] Suspect 자동 생성 [ ] 커버리지 계산 [ ] 매트릭스 UI [ ] Suspect 해결
 
-### Dependencies
-- PrismaService, AuthService (권한), AuditService, TemplateService
+### Module: Workflows
+- **FR**: FR-WF-001~007
+- **API**: GET/POST/PUT /spaces/:key/workflows, POST /spaces/:key/workflows/:id/states, POST /spaces/:key/workflows/:id/transitions, GET/POST /spaces/:key/reviews, POST /spaces/:key/reviews/:id/findings, POST /spaces/:key/approvals
+- **Model**: Workflow, WorkflowState, WorkflowTransition, WorkflowTransitionHistory, Review, ReviewParticipant, ReviewFinding, Approval, ElectronicSignature
+- **Rules**: 조건 체크 (역할, 필드, 승인 수). 사후 액션 (알림, 링크, 필드). Finding → Defect 자동 생성. 전자 서명 (password/certificate/sso/drawn). Kanban/Scrum 보드.
+- **Deps**: PrismaService, WorkItemService, SpaceService, NotificationService, TraceabilityService, AuditService
+- **AC**: [ ] 조건 체크 [ ] 사후 액션 [ ] 리뷰 [ ] Finding→Defect [ ] 전자 서명 [ ] Kanban 보드
 
-### Acceptance Criteria
-- [ ] 프로젝트 생성 시 워크플로우 6개 자동 생성
-- [ ] 프로젝트 생성 시 역할 6개 자동 생성
-- [ ] 멤버 추가 시 감사 로그 기록
-- [ ] 권한 없는 사용자 접근 시 403 반환
-- [ ] 아카이브된 프로젝트 수정 시 400 반환
+### Module: Compliance
+- **FR**: FR-COMPLIANCE-001~005
+- **API**: GET /spaces/:key/compliance, GET /spaces/:key/compliance/:processCode, PUT /spaces/:key/compliance/:processCode/checklists/:id, POST /spaces/:key/compliance/assessments, GET/PUT /spaces/:key/deliverables
+- **Model**: ProcessArea, SpaceProcessArea, AspiceDeliverable, ProjectDeliverable, DeliverableVersion, ProcessAssessment, ComplianceChecklist
+- **Rules**: 프로젝트 생성 시 SpaceProcessArea 자동. 산출물 상태: not_started→in_progress→in_review→approved→released. 체크리스트: not_started→in_progress→completed→not_applicable. 커버리지: (완료/전체)×100. 증적: Audit Log → EvidenceLink.
+- **Deps**: PrismaService, SpaceService, WorkItemService, AuditService
+- **AC**: [ ] 프로세스별 완료율 [ ] 체크리스트 상태 [ ] 산출물 관리 [ ] 프로세스 평가 [ ] 증적 수집
 
----
+### Module: Search
+- **FR**: FR-SEARCH-001~006
+- **API**: GET /search, GET /search/suggest, POST /search/index, DELETE /search/index/:id
+- **Model**: (Meilisearch 인덱스, Prisma 모델 없음)
+- **Rules**: Work Item CRUD 시 비동기 인덱싱. 타이포 허용 (fuzziness: AUTO). 하이라이팅. 필터: spaceKey, status, priority, aspiceProcess, asilLevel, type. 자동완성: prefix, 5개.
+- **Deps**: Meilisearch Client, WorkItemService
+- **AC**: [ ] 전문 검색 [ ] 타이포 허용 [ ] 필터 [ ] 자동완성 [ ] 하이라이팅
 
-## Module: WorkItems (이슈 + 페이지 통합)
+### Module: MCP
+- **FR**: FR-MCP-001~007
+- **API**: GET /mcp/sse (SSE), POST /mcp/message (JSON-RPC)
+- **Model**: ApiKey, McpSession
+- **Rules**: SSE 연결 → JSON-RPC 메시지 교환. 인증: Bearer JWT 또는 X-MCP-API-Key. 권한: 스코프 기반. 모든 tool call → Audit Log. Rate Limiting: 60/min. 20+ 도구.
+- **Deps**: 모든 서비스 (Tool Registry)
+- **AC**: [ ] SSE 연결 [ ] JSON-RPC [ ] 20+ 도구 [ ] API Key 인증 [ ] Audit Log
 
-### Requirements
-- FR-WI-001: 통합 객체 (type으로 구분)
-- FR-WI-002: CRUD
-- FR-WI-003: 상태 워크플로우 (프로세스별)
-- FR-WI-004: 우선순위, 담당자, 라벨, 컴포넌트
-- FR-WI-005: 부모-자식 계층
-- FR-WI-006: 이슈 링크 (typed)
-- FR-WI-007: 버전 관리
-- FR-WI-008: JQL 유사 쿼리
+### Module: Upload
+- **FR**: FR-UPLOAD-001~006
+- **API**: POST /upload, GET/DELETE /attachments/:id, GET /attachments/:id/download, GET /attachments/:id/thumbnail
+- **Model**: Attachment
+- **Rules**: 허용 MIME 화이트리스트. 50MB 제한. Magic Number 검증. 이미지 → 썸네일 (200x200 WebP). 경로: {type}/{id}/{timestamp}_{filename}.
+- **Deps**: MinIO (S3 SDK), PrismaService, ThumbnailService (Sharp)
+- **AC**: [ ] 파일 업로드 [ ] MIME 검증 [ ] Magic Number [ ] 썸네일 [ ] 크기 제한
 
-### API Contract
-```
-GET    /spaces/:key/issues                    → WorkItemListResponse[]
-GET    /spaces/:key/issues/:issueKey           → WorkItemDetailResponse
-POST   /spaces/:key/issues                    → CreateWorkItemDto → WorkItemResponse
-PUT    /spaces/:key/issues/:issueKey          → UpdateWorkItemDto → WorkItemResponse
-DELETE /spaces/:key/issues/:issueKey          → 204
-POST   /spaces/:key/issues/:issueKey/transitions → { transition, comment } → WorkItemResponse
-POST   /spaces/:key/issues/:issueKey/comments  → { body } → CommentResponse
-POST   /spaces/:key/issue-links               → { from, to, linkType } → LinkResponse
-```
+### Module: Export
+- **FR**: FR-EXPORT-001~007
+- **API**: GET /export/documents/:id/word, GET /export/documents/:id/pdf, GET /export/spaces/:key/traceability/excel, GET /export/spaces/:key/issues/excel
+- **Model**: (Export 결과 → MinIO 저장)
+- **Rules**: Word: TipTap JSON → docx. PDF: HTML → PDF (Puppeteer) + 워터마크. Excel: 추적성 매트릭스, 이슈 목록. HTML: 정적 페이지. Export 파일 MinIO 저장.
+- **Deps**: DocumentService, TraceabilityService, SpaceService, MinIO
+- **AC**: [ ] Word export [ ] PDF export (워터마크) [ ] Excel export [ ] HTML export
 
-### Data Model
-```prisma
-model WorkItem { id, spaceId, typeId, key, title, description, status, priority, assigneeId, reporterId, parentId, epicId, workflowStateId, version, baselineId, body, bodyText, labels, components, fixVersions, dueDate, storyPoints, aspiceProcess, asilLevel, estimatedHours, actualHours, progressPercent, startDate, endDate, createdAt, updatedAt, resolvedAt }
-model WorkItemLink { id, fromId, toId, linkType, createdById, createdAt }
-model WorkItemVersion { id, workItemId, version, title, body, bodyText, changedById, changeSummary, createdAt }
-model WorkItemWatcher { workItemId, userId, addedAt }
-```
+### Module: Stakeholders
+- **FR**: FR-STAKE-001~008
+- **API**: GET/POST /admin/stakeholders/types, PUT /admin/stakeholders/types/:id/policy, GET/POST /admin/stakeholders/organizations, POST /admin/stakeholders/invitations, GET /portal/:spaceKey, GET /portal/:spaceKey/docs
+- **Model**: StakeholderType, ExternalOrganization, UserStakeholderProfile, StakeholderAccessPolicy, SpaceStakeholderAccess, Invitation, RegistrationRequest, NdaDocument, NdaSignature
+- **Rules**: 내부: 회사 도메인 → 자동 승인. 외부: 비회사 → 관리자 승인. 접근 정책: 허용 액션, 문서 범위, 데이터 필터. 프로젝트별 접근: allowedSpaces, restrictedSpaces. NDA: 서명 전 차단. 포털: 릴리스된 문서만.
+- **Deps**: PrismaService, SpaceService, AuthService, NotificationService
+- **AC**: [ ] 유형 CRUD [ ] 접근 정책 [ ] 초대 [ ] 포털 [ ] NDA
 
-### Business Rules
-- 키 자동 생성: {SPACE_KEY}-{순번} (ADAS-1, ADAS-2, ...)
-- 상태 전이: Workflow 조건 체크 (역할, 필드 필수, 승인 수)
-- 전이 시 사후 액션 실행 (알림, 링크 생성, 필드 업데이트)
-- 전이 시 Audit Log 자동 기록
-- 삭제 시 Trace Link cascade 삭제
-- 수정 시 Version History 자동 생성
-- 수정 시 Suspect Link 자동 생성 (연결된 항목)
-- Meilisearch 인덱싱 (비동기)
+### Module: Notifications
+- **FR**: FR-NOTIF-001~005
+- **API**: GET /notifications, PUT /notifications/:id/read, PUT /notifications/read-all, GET/PUT /notifications/preferences
+- **Model**: Notification, NotificationPreference
+- **Rules**: WebSocket 실시간. 이메일: Bull Queue + Redis. @멘션: 댓글 파싱. 알림 설정: 유형별 on/off. 30일 보관.
+- **Deps**: PrismaService, WebSocketGateway, EmailService (Bull), UserService
+- **AC**: [ ] WebSocket [ ] 이메일 [ ] @멘션 [ ] 설정 [ ] 이력
 
-### Dependencies
-- PrismaService, SpaceService, WorkflowService, TraceabilityService, AuditService, SearchService, NotificationService
+### Module: Git/CI
+- **FR**: FR-GIT-001~005
+- **API**: POST /git/webhook, GET/POST/DELETE /git/connections
+- **Model**: (Webhook, WebhookDelivery)
+- **Rules**: 스마트 커밋: #done, #comment, #time. PR → 이슈 자동 링크. CI/CD → 상태 업데이트 + 결함 생성. Webhook HMAC 검증.
+- **Deps**: WorkItemService, WorkflowService, CommentService, DefectService
+- **AC**: [ ] OAuth 연동 [ ] 스마트 커밋 [ ] PR 링크 [ ] CI/CD [ ] HMAC 검증
 
-### Acceptance Criteria
-- [ ] 이슈 생성 시 키 자동 생성 (ADAS-1)
-- [ ] 상태 전이 시 조건 체크 (역할, 필드)
-- [ ] 전이 시 사후 액션 실행 (알림)
-- [ ] 수정 시 버전 히스토리 생성
-- [ ] 수정 시 Suspect Link 생성
-- [ ] 삭제 시 Trace Link cascade 삭제
+### Module: Auth
+- **FR**: FR-AUTH-001~010
+- **API**: POST /auth/login, POST /auth/register, GET /auth/verify-email, POST /auth/refresh, POST /auth/logout, GET /auth/me
+- **Model**: User, UserIdentity, UserSession, Role, Permission, RolePermission, UserRole, RegistrationRequest, ApprovalAuditLog
+- **Rules**: 내부: 회사 도메인 → 자동 승인. 외부: 비회사 → 관리자 승인. Keycloak SSO. 2FA. LDAP. 슈퍼관리자: 시스템 설정, 전체 감사 로그.
+- **Deps**: KeycloakService, PrismaService, NotificationService
+- **AC**: [ ] 내부 자동 승인 [ ] 외부 승인 대기 [ ] Keycloak SSO [ ] 2FA [ ] LDAP [ ] 슈퍼관리자
 
----
-
-## Module: Documents (Confluence 스타일)
-
-### Requirements
-- FR-DOC-001: 리치 텍스트 에디터 (TipTap)
-- FR-DOC-002: 페이지 트리 (부모-자식)
-- FR-DOC-003: 버전 히스토리 (diff)
-- FR-DOC-004: 인라인 댓글 + 스레드
-- FR-DOC-005: 첨부파일
-- FR-DOC-006: 페이지 템플릿 (ASPICE 산출물)
-- FR-DOC-007: 목차 (TOC) 자동 생성
-- FR-DOC-008: 다이어그램 (Mermaid) 삽입 + 프리뷰
-- FR-DOC-009: 코드 블록 (syntax highlighting)
-- FR-DOC-010: 저장 시 프리뷰 (Split View)
-
-### API Contract
-```
-GET    /spaces/:key/docs                    → PageTreeResponse
-GET    /spaces/:key/docs/:pageId             → PageDetailResponse
-POST   /spaces/:key/docs                    → CreatePageDto → PageResponse
-PUT    /spaces/:key/docs/:pageId            → UpdatePageDto → PageResponse
-DELETE /spaces/:key/docs/:pageId            → 204
-GET    /spaces/:key/docs/:pageId/versions   → PageVersionResponse[]
-GET    /spaces/:key/docs/:pageId/comments   → CommentResponse[]
-POST   /spaces/:key/docs/:pageId/comments   → { body, isInline, anchor } → CommentResponse
-```
-
-### Data Model
-```prisma
-model Page { workItemId, parentPageId, templateId, position, isHomepage, viewCount, lastViewedAt }
-model PageTemplate { id, spaceId, name, description, body, category, aspiceProcess, isSystem, createdById, createdAt }
-model PageVersion { id, pageId, version, title, body, bodyText, authorId, changeSummary, createdAt }
-model Comment { id, targetType, targetId, parentId, authorId, body, bodyHtml, anchor, isInline, isResolved, resolvedById, resolvedAt, createdAt, updatedAt }
-model CommentReaction { commentId, userId, emoji, createdAt }
-```
-
-### Business Rules
-- 페이지는 Work Item (type=page)으로 저장
-- 저장 시 Version History 자동 생성
-- 수정 시 Suspect Link 자동 생성 (연결된 항목)
-- 댓글 스레드 (parent_id로 계층)
-- 인라인 댓글 (anchor: {from, to, text})
-- TOC: H1~H6 제목에서 자동 생성
-- Mermaid: 코드 블록 → SVG 렌더링 (클라이언트)
-- 페이지 잠금: 편집 중 다른 사용자 읽기 전용
-
-### Dependencies
-- PrismaService, WorkItemService, TraceabilityService, AuditService, UploadService
-
-### Acceptance Criteria
-- [ ] TipTap 에디터에서 텍스트/표/코드/다이어그램 작성
-- [ ] 저장 시 버전 히스토리 자동 생성
-- [ ] 수정 시 Suspect Link 생성
-- [ ] 인라인 댓글 + 스레드
-- [ ] Mermaid 다이어그램 렌더링
-- [ ] TOC 자동 생성
+### Module: Health
+- **FR**: (비기능)
+- **API**: GET /health, GET /health/ready
+- **Model**: (없음)
+- **Rules**: DB, Redis, Meilisearch, Keycloak, MinIO 연결 상태 확인. Docker/Kubernetes liveness probe.
+- **Deps**: PrismaService, Redis, Meilisearch, Keycloak, MinIO
+- **AC**: [ ] 모든 서비스 상태 확인 [ ] 200/503 응답
 
 ---
 
-## Module: Traceability (양방향 추적성)
+## 3. 구현 순서 (Dependency Order)
 
-### Requirements
-- FR-TRACE-001: 범용 추적성 링크 (typed)
-- FR-TRACE-002: 양방향 링크 (A→B, B→A 자동)
-- FR-TRACE-003: Suspect Link 자동 감지
-- FR-TRACE-004: 추적성 매트릭스 (그래프/테이블)
-- FR-TRACE-005: 커버리지 계산
-- FR-TRACE-006: 베이스라인 스냅샷
-
-### API Contract
 ```
-GET    /spaces/:key/trace                    → TraceMatrixResponse
-GET    /spaces/:key/trace/coverage           → CoverageReportResponse
-GET    /spaces/:key/trace/suspect            → SuspectLinkResponse[]
-POST   /spaces/:key/trace/links              → CreateTraceLinkDto → TraceLinkResponse
-DELETE /spaces/:key/trace/links/:id          → 204
-POST   /spaces/:key/trace/suspect/:id/resolve → { resolution } → SuspectLinkResponse
-```
-
-### Data Model
-```prisma
-model TraceLink { id, fromType, fromId, toType, toId, linkType, description, createdById, createdAt, baselineId, isSuspect }
-model SuspectLink { id, traceLinkId, reason, markedAt, markedById, resolvedAt, resolvedById, resolution }
-model TraceMatrixSnapshot { id, spaceId, baselineId, name, matrixData, totalRequirements, coveredRequirements, coveragePercent, generatedById, generatedAt }
-model CoverageReport { id, spaceId, baselineId, reportType, totalItems, coveredItems, coveragePercent, uncoveredItems, generatedById, generatedAt }
-```
-
-### Business Rules
-- 링크 생성 시 양방향 자동 생성 (from→to, to→from)
-- 링크 타입: verifies, satisfies, implements, tests, derives, refines, traces_to
-- 항목 수정 시 연결된 모든 링크 → isSuspect = TRUE
-- 커버리지: (커버된 요구사항 수 / 전체 요구사항 수) × 100
-- 베이스라인 시점 스냅샷 저장
-- Suspect Link 해결: verified, updated, waived
-
-### Dependencies
-- PrismaService, WorkItemService, SpaceService, AuditService, NotificationService
-
-### Acceptance Criteria
-- [ ] 링크 생성 시 양방향 자동 생성
-- [ ] 항목 수정 시 Suspect Link 자동 생성
-- [ ] 커버리지 계산 정확 (100% chain)
-- [ ] 매트릭스 UI (그래프/테이블)
-- [ ] Suspect Link 해결 (resolve)
-
----
-
-## Module: Workflows (상태 머신 + 리뷰 + 승인)
-
-### Requirements
-- FR-WF-001: 프로세스별 워크플로우
-- FR-WF-002: 상태 전이 (조건, 사후 액션)
-- FR-WF-003: 리뷰 세션
-- FR-WF-004: 리뷰 지적 사항 (Finding)
-- FR-WF-005: 승인 (전자 서명)
-- FR-WF-006: Kanban/Scrum 보드
-
-### API Contract
-```
-GET    /spaces/:key/workflows              → WorkflowResponse[]
-POST   /spaces/:key/workflows              → CreateWorkflowDto → WorkflowResponse
-PUT    /spaces/:key/workflows/:id          → UpdateWorkflowDto → WorkflowResponse
-POST   /spaces/:key/workflows/:id/states   → CreateStateDto → StateResponse
-POST   /spaces/:key/workflows/:id/transitions → CreateTransitionDto → TransitionResponse
-GET    /spaces/:key/boards                → BoardResponse[]
-POST   /spaces/:key/boards                → CreateBoardDto → BoardResponse
-GET    /spaces/:key/reviews               → ReviewResponse[]
-POST   /spaces/:key/reviews               → CreateReviewDto → ReviewResponse
-POST   /spaces/:key/reviews/:id/findings  → CreateFindingDto → FindingResponse
-POST   /spaces/:key/approvals              → { entityType, entityId, decision, signature } → ApprovalResponse
-```
-
-### Data Model
-```prisma
-model Workflow { id, spaceId, name, description, aspiceProcess, isDefault, isSystem, createdById, createdAt, updatedAt }
-model WorkflowState { id, workflowId, name, description, category, color, position, isInitial, isTerminal }
-model WorkflowTransition { id, workflowId, name, fromStateId, toStateId, conditionType, conditionConfig, postActions, isGlobal, position }
-model WorkflowTransitionHistory { id, workItemId, transitionId, fromStateId, toStateId, performedById, comment, performedAt }
-model Review { id, spaceId, title, description, reviewType, targetType, targetId, status, moderatorId, aspiceProcess, dueDate, createdById, createdAt, completedAt }
-model ReviewParticipant { reviewId, userId, role, status, decisionAt, comment }
-model ReviewFinding { id, reviewId, title, description, severity, status, location, defectId, createdById, createdAt, resolvedAt }
-model Approval { id, entityType, entityId, approverId, decision, comment, signature, signatureMethod, decidedAt }
-model ElectronicSignature { id, entityType, entityId, signerId, signatureType, signatureData, signedAt, ipAddress, isEvidence, evidenceTag, comment }
-```
-
-### Business Rules
-- 상태 전이 시 조건 체크 (역할, 필드 필수, 승인 수)
-- 전이 시 사후 액션 실행 (알림, 링크, 필드 업데이트)
-- 리뷰 Finding → Defect 자동 생성 (선택)
-- 전자 서명: 비밀번호/인증서/SSO/그리기
-- 보드: Kanban (컬럼=상태), Scrum (스프린트)
-- 드래그앤드롭 → 상태 전이
-
-### Dependencies
-- PrismaService, WorkItemService, SpaceService, NotificationService, TraceabilityService, AuditService
-
-### Acceptance Criteria
-- [ ] 상태 전이 시 조건 체크
-- [ ] 전이 시 사후 액션 실행
-- [ ] 리뷰 세션 생성/참여/결정
-- [ ] Finding → Defect 자동 생성
-- [ ] 전자 서명 저장
-- [ ] Kanban 보드 드래그앤드롭
-
----
-
-## Module: Compliance (ASPICE)
-
-### Requirements
-- FR-COMPLIANCE-001: ASPICE 프로세스 영역 정의
-- FR-COMPLIANCE-002: 프로세스별 체크리스트
-- FR-COMPLIANCE-003: 컴플라이언스 대시보드
-- FR-COMPLIANCE-004: 산출물 템플릿
-- FR-COMPLIANCE-005: 프로세스 평가 (Capability Level)
-
-### API Contract
-```
-GET    /spaces/:key/compliance                    → ComplianceSummaryResponse
-GET    /spaces/:key/compliance/:processCode       → ProcessDetailResponse
-PUT    /spaces/:key/compliance/:processCode/checklists/:id → UpdateChecklistDto
-POST   /spaces/:key/compliance/assessments        → CreateAssessmentDto → AssessmentResponse
-GET    /spaces/:key/deliverables                 → DeliverableResponse[]
-PUT    /spaces/:key/deliverables/:id             → UpdateDeliverableDto → DeliverableResponse
-```
-
-### Data Model
-```prisma
-model ProcessArea { id, code, name, category, description, level, parentCode, requiredWorkProducts, sortOrder }
-model SpaceProcessArea { spaceId, processCode, isApplicable, notes }
-model AspiceDeliverable { id, processCode, name, shortName, description, isMandatory, templateId, sortOrder }
-model ProjectDeliverable { id, spaceId, deliverableId, workItemId, status, assignedToId, dueDate, completedAt, createdAt }
-model DeliverableVersion { id, projectDeliverableId, workItemVersionId, baselineId, versionLabel, isReleased, createdAt }
-model ProcessAssessment { id, spaceId, processCode, capabilityLevel, assessmentDate, assessorId, evidenceItems, notes, createdAt }
-model ComplianceChecklist { id, spaceId, processCode, itemName, description, isRequired, status, evidenceId, assignedToId, dueDate, completedAt, createdAt }
-```
-
-### Business Rules
-- 프로젝트 생성 시 SpaceProcessArea 자동 생성 (템플릿의 processCodes)
-- 산출물 상태: not_started → in_progress → in_review → approved → released
-- 체크리스트 상태: not_started → in_progress → completed → not_applicable
-- 커버리지: (완료 체크리스트 수 / 전체 체크리스트 수) × 100
-- 증적: Audit Log → EvidenceLink → ASPICE 조항 매핑
-
-### Dependencies
-- PrismaService, SpaceService, WorkItemService, AuditService
-
-### Acceptance Criteria
-- [ ] 프로세스별 완료율 계산
-- [ ] 체크리스트 상태 변경
-- [ ] 산출물 상태 관리
-- [ ] 프로세스 평가 (Capability Level)
-- [ ] 증적 수집 (Audit Log → ASPICE 매핑)
-
----
-
-## Module: Search (Meilisearch)
-
-### Requirements
-- FR-SEARCH-001: 전문 검색 (제목, 본문, 코멘트)
-- FR-SEARCH-002: 타이포 허용
-- FR-SEARCH-003: 필터 (프로젝트, 상태, 우선순위, ASIL, ASPICE)
-- FR-SEARCH-004: 자동완성
-- FR-SEARCH-005: JQL 유사 쿼리
-- FR-SEARCH-006: CQL 유사 쿼리
-
-### API Contract
-```
-GET    /search?q=...&filter=...&limit=50    → SearchResultResponse
-GET    /search/suggest?q=...                → SuggestResponse[]
-POST   /search/index                        → IndexDocumentDto → 201
-DELETE /search/index/:id                   → 204
-```
-
-### Business Rules
-- Work Item CRUD 시 Meilisearch 자동 인덱싱 (비동기)
-- 타이포 허용 (fuzziness: AUTO)
-- 하이라이팅 (검색어 강조)
-- 필터: spaceKey, status, priority, aspiceProcess, asilLevel, type
-- 자동완성: prefix 검색, 5개 결과
-
-### Dependencies
-- Meilisearch Client, WorkItemService
-
-### Acceptance Criteria
-- [ ] 전문 검색 (제목 + 본문)
-- [ ] 타이포 허용 ("requirment" → "requirement")
-- [ ] 필터 적용 (상태, 우선순위, 프로젝트)
-- [ ] 자동완성 (5개 결과)
-- [ ] 하이라이팅 (검색어 강조)
-
----
-
-## Module: MCP (AI 연동)
-
-### Requirements
-- FR-MCP-001: MCP SSE 엔드포인트
-- FR-MCP-002: MCP JSON-RPC 엔드포인트
-- FR-MCP-003: tools/list, tools/call
-- FR-MCP-004: resources/list, resources/read
-- FR-MCP-005: 20+ 도구 (Jira/Confluence 호환 + ALM 확장)
-- FR-MCP-006: API Key 관리
-- FR-MCP-007: MCP 감사 로그
-
-### API Contract
-```
-GET    /mcp/sse                           → SSE Stream
-POST   /mcp/message                       → JsonRpcRequest → JsonRpcResponse
-```
-
-### MCP Tools (20+)
-```
-Jira/Confluence 호환:
-  alm_search_issues, alm_get_issue, alm_create_issue, alm_update_issue,
-  alm_transition_issue, alm_add_comment, alm_link_issues,
-  alm_search_pages, alm_get_page, alm_create_page, alm_update_page
-
-ALM 확장:
-  alm_get_traceability, alm_get_coverage, alm_get_compliance_status,
-  alm_create_baseline, alm_get_project_summary
-```
-
-### Business Rules
-- SSE 연결 수립 → JSON-RPC 메시지 교환
-- 인증: Bearer JWT 또는 X-MCP-API-Key
-- 권한: API Key 스코프 기반 (alm:read, alm:write, alm:admin)
-- 모든 tool call → Audit Log 기록
-- Rate Limiting: 60 요청/분
-
-### Dependencies
-- 모든 서비스 모듈 (Tool Registry)
-
-### Acceptance Criteria
-- [ ] SSE 연결 수립
-- [ ] JSON-RPC 메시지 처리
-- [ ] 20+ 도구 실행
-- [ ] API Key 인증
-- [ ] Audit Log 기록
-
----
-
-## Module: Upload (MinIO)
-
-### Requirements
-- FR-UPLOAD-001: 파일 업로드 (MinIO)
-- FR-UPLOAD-002: MIME 타입 검증
-- FR-UPLOAD-003: 파일 크기 제한 (50MB)
-- FR-UPLOAD-004: Magic Number 검증
-- FR-UPLOAD-005: 썸네일 생성 (이미지)
-- FR-UPLOAD-006: 업로드 진행률 (WebSocket)
-
-### API Contract
-```
-POST   /upload                            → multipart/form-data → AttachmentResponse
-GET    /attachments/:id                   → AttachmentDetailResponse
-DELETE /attachments/:id                   → 204
-GET    /attachments/:id/download          → File (binary)
-GET    /attachments/:id/thumbnail         → Image (binary)
-```
-
-### Business Rules
-- 허용 MIME: image/*, application/pdf, text/plain, text/markdown
-- 차단 MIME: application/x-executable, application/javascript, text/html
-- Magic Number 검증 (확장자 위조 방지)
-- 이미지 → 썸네일 자동 생성 (200x200 WebP)
-- 파일 경로: {type}/{id}/{timestamp}_{filename}
-
-### Dependencies
-- MinIO (S3 SDK), PrismaService, ThumbnailService (Sharp)
-
-### Acceptance Criteria
-- [ ] 파일 업로드 (MinIO)
-- [ ] MIME 검증 (허용/차단)
-- [ ] Magic Number 검증
-- [ ] 썸네일 생성 (이미지)
-- [ ] 50MB 크기 제한
-
----
-
-## Module: Export (Word/PDF/Excel/HTML)
-
-### Requirements
-- FR-EXPORT-001: Word (.docx) export
-- FR-EXPORT-002: PDF export (워터마크)
-- FR-EXPORT-003: Excel (.xlsx) export
-- FR-EXPORT-004: HTML export
-
-### API Contract
-```
-GET    /export/documents/:id/word         → .docx (binary)
-GET    /export/documents/:id/pdf          → .pdf (binary, watermark)
-GET    /export/spaces/:key/traceability/excel → .xlsx (binary)
-GET    /export/spaces/:key/issues/excel   → .xlsx (binary)
-```
-
-### Business Rules
-- Word: TipTap JSON → docx (제목, 본문, 표, 이미지, 목차)
-- PDF: HTML → PDF (Puppeteer) + 워터마크 (사용자명, 날짜, "CONFIDENTIAL")
-- Excel: 추적성 매트릭스, 이슈 목록, R&R 매트릭스
-- HTML: 정적 페이지 (CSS 인라인, 이미지 Base64)
-- Export 파일 MinIO에 저장 + 다운로드 URL 반환
-
-### Dependencies
-- DocumentService, TraceabilityService, SpaceService, MinIO
-
-### Acceptance Criteria
-- [ ] Word export (제목, 본문, 표)
-- [ ] PDF export (워터마크 포함)
-- [ ] Excel export (추적성 매트릭스)
-- [ ] HTML export (오프라인 열람)
-
----
-
-## Module: Stakeholders (이해관계자)
-
-### Requirements
-- FR-STAKE-001: 내부/외부 이해관계자 유형
-- FR-STAKE-002: 외부 조직 관리
-- FR-STAKE-003: 유형별 접근 정책
-- FR-STAKE-004: 프로젝트별 접근 설정
-- FR-STAKE-005: 초대 관리
-- FR-STAKE-006: NDA 서명
-- FR-STAKE-007: 외부 포털
-
-### API Contract
-```
-GET    /admin/stakeholders/types          → StakeholderTypeResponse[]
-POST   /admin/stakeholders/types          → CreateTypeDto → StakeholderTypeResponse
-PUT    /admin/stakeholders/types/:id/policy → UpdatePolicyDto → PolicyResponse
-GET    /admin/stakeholders/organizations  → ExternalOrgResponse[]
-POST   /admin/stakeholders/organizations  → CreateOrgDto → ExternalOrgResponse
-POST   /admin/stakeholders/invitations    → InviteDto → InvitationResponse
-GET    /portal/:spaceKey                  → PortalDashboardResponse
-GET    /portal/:spaceKey/docs             → PortalDocsResponse[]
-```
-
-### Business Rules
-- 내부 사용자: 회사 도메인 이메일 → 자동 승인
-- 외부 사용자: 비회사 이메일 → 관리자 승인 필요
-- 접근 정책: 허용 액션, 문서 접근 범위, 데이터 필터
-- 프로젝트별 접근: allowedSpaces, restrictedSpaces
-- NDA: 서명 전 접근 차단
-- 외부 포털: 릴리스된 문서만 표시
-
-### Dependencies
-- PrismaService, SpaceService, AuthService, NotificationService
-
-### Acceptance Criteria
-- [ ] 이해관계자 유형 CRUD
-- [ ] 접근 정책 설정
-- [ ] 초대 발송/수락
-- [ ] 외부 포털 (릴리스된 문서만)
-- [ ] NDA 서명
-
----
-
-## Module: Notifications
-
-### Requirements
-- FR-NOTIF-001: 인앱 알림 (WebSocket)
-- FR-NOTIF-002: 이메일 알림
-- FR-NOTIF-003: @멘션 알림
-- FR-NOTIF-004: 알림 설정
-- FR-NOTIF-005: 알림 이력
-
-### API Contract
-```
-GET    /notifications                     → NotificationResponse[]
-PUT    /notifications/:id/read            → 204
-PUT    /notifications/read-all            → 204
-GET    /notifications/preferences         → PreferenceResponse[]
-PUT    /notifications/preferences         → UpdatePreferenceDto → PreferenceResponse
-```
-
-### Business Rules
-- WebSocket 실시간 전송 (Socket.io)
-- 이메일: Bull Queue + Redis (비동기)
-- @멘션: 댓글에서 @username 파싱 → 알림
-- 알림 설정: 유형별 on/off, 채널별 on/off
-- 알림 이력: 30일 보관
-
-### Dependencies
-- PrismaService, WebSocketGateway, EmailService (Bull), UserService
-
-### Acceptance Criteria
-- [ ] WebSocket 실시간 알림
-- [ ] 이메일 알림 (Bull Queue)
-- [ ] @멘션 알림
-- [ ] 알림 설정 (on/off)
-- [ ] 알림 이력 조회
-
----
-
-## Module: Git/CI 연동
-
-### Requirements
-- FR-GIT-001: GitHub/GitLab 연동 (OAuth)
-- FR-GIT-002: 스마트 커밋 (키워드 → 상태 전이)
-- FR-GIT-003: PR/MR → 이슈 자동 링크
-- FR-GIT-004: CI/CD 파이프라인 연동
-- FR-GIT-005: 코드 커버리지 연동
-
-### API Contract
-```
-POST   /git/webhook                       → WebhookEvent → 200
-GET    /git/connections                   → ConnectionResponse[]
-POST   /git/connections                   → CreateConnectionDto → ConnectionResponse
-DELETE /git/connections/:id               → 204
-```
-
-### Business Rules
-- 스마트 커밋: "ADAS-123 #done #comment Fixed" → 상태 전이 + 코멘트
-- PR: 제목/본문에서 이슈 키 추출 → 자동 링크
-- CI/CD: 빌드 성공/실패 → 이슈 상태 업데이트 + 결함 생성
-- Webhook: HMAC 서명 검증
-
-### Dependencies
-- WorkItemService, WorkflowService, CommentService, DefectService
-
-### Acceptance Criteria
-- [ ] GitHub/GitLab OAuth 연동
-- [ ] 스마트 커밋 파싱 (#done, #comment, #time)
-- [ ] PR → 이슈 자동 링크
-- [ ] CI/CD 결과 → 이슈 상태 업데이트
-- [ ] Webhook HMAC 검증
-
----
-
-## 8. Frontend 구조
-
-### 8.1 페이지 목록
-```
-pages/
-├── auth/ (Login, Register, VerifyEmail)
-├── dashboard/ (Dashboard)
-├── spaces/ (SpacesList, SpaceDashboard, Board, Backlog, IssuesList, IssueDetail, DocsTree, PageDetail, Requirements, Tests, Traceability, Coverage, Compliance, ProcessDetail, Baselines, BaselineDetail, ChangeRequests, Releases, Reviews, Members, SpaceSettings)
-├── admin/ (AdminDashboard, UserManagement, Registrations, Stakeholders, AllSpaces, ApiKeys)
-├── super-admin/ (SuperAdminDashboard, SystemSettings, AuditLogs)
-├── portal/ (PortalDashboard, PortalDocs, PortalPageDetail, PortalRequirements)
-└── NotFound
-```
-
-### 8.2 상태 관리 (Zustand)
-```typescript
-// stores/auth.store.ts: user, token, isAuthenticated, login, logout
-// stores/space.store.ts: currentSpace, spaces, setCurrentSpace, fetchSpaces
-// stores/ui.store.ts: sidebarOpen, theme, locale, toggleSidebar, setTheme, setLocale
-```
-
-### 8.3 API 클라이언트
-```typescript
-// services/api.client.ts: axios + JWT interceptor + 401 refresh
+Level 0 (의존성 없음): Health, Auth
+Level 1 (Auth 의존): Spaces, Users, Roles
+Level 2 (Spaces 의존): WorkItems, Documents, Workflows
+Level 3 (WorkItems 의존): Requirements, Tests, Traceability
+Level 4 (Traceability 의존): Compliance, Baseline, Export
+Level 5 (모든 모듈 의존): MCP, Search, Notifications
+Level 6 (외부 연동): Git/CI, Stakeholders, Mobile
+
+병렬 구현 가능:
+  Stream A: Auth → Spaces → WorkItems → Traceability → Compliance
+  Stream B: Requirements → Tests (WorkItems 의존)
+  Stream C: Documents (WorkItems 의존)
+  Stream D: Workflows (Spaces 의존)
+  Stream E: Search + Notifications + Upload (독립)
+  Stream F: MCP + Export (모든 모듈 의존)
+  Stream G: Stakeholders + Git (Spaces + WorkItems 의존)
 ```
 
 ---
 
-## 9. Testing 명세
+## 4. AI 구현 프롬프트 (모듈별)
 
-### 9.1 테스트 구조
+### Step 1: 인프라
 ```
-backend/test/
-├── setup.ts (Testcontainers)
-├── factories/ (user, space, work-item)
-└── e2e/ (auth, space, work-item)
-backend/src/**/*.spec.ts (Unit)
+"Docker Compose를 작성해줘. 서비스: PostgreSQL 16, Redis 7, Meilisearch v1.6, MinIO, Keycloak 24, Caddy. OCI 무료 티어 호환. .env에서 환경변수 읽기. Health Check 설정. 볼륨 영속화."
 ```
 
-### 9.2 커버리지 목표
-- Service: 90%+, Controller: 80%+, 전체: 80%+
-- E2E: 핵심 10개 시나리오
-
----
-
-## 10. Security 명세
-
-### 10.1 인증/인가
-- Keycloak JWT (Access 15분, Refresh 7일)
-- RBAC (3단계: Global → Space → WorkItem)
-- Permission Guard (데코레이터 기반)
-
-### 10.2 보안 설정
-- CORS: Frontend URL만 허용
-- Rate Limiting: 10req/s, 50req/10s, 200req/min
-- Helmet: CSP, HSTS, X-Frame-Options
-- 파일 업로드: MIME 화이트리스트, Magic Number, 50MB 제한
-
----
-
-## 11. Performance 명세
-
-### 11.1 캐싱
-- Phase 1: 인메모리 (TTL 5분)
-- Phase 2: Redis (TTL 5분, 캐시 무효화)
-- 캐시 대상: Space, User, Permission, Workflow
-
-### 11.2 DB 인덱스
-- WorkItem: (spaceId), (status), (assigneeId), (aspiceProcess), FTS
-- TraceLink: (fromType, fromId), (toType, toId)
-- AuditLog: (entityType, entityId), (createdAt)
-- Comment: (targetType, targetId)
-- Notification: (userId, isRead, createdAt DESC)
-
-### 11.3 페이지네이션
-- Cursor 기반 (대용량)
-- Offset 기반 (소규모, 관리자)
-
----
-
-## 12. i18n 명세
-
-### 12.1 지원 언어
-- Phase 1: 한국어 (ko) + 영어 (en)
-- Phase 2: + 일본어 (ja), 독일어 (de)
-
-### 12.2 번역 키 구조
-```json
-{ "common": { "save": "저장" }, "space": { "title": "프로젝트" }, "workItem": { "status": { "open": "열림" } } }
+### Step 2: Prisma Schema
+```
+"db/schema/*.sql의 12개 SQL 파일을 Prisma schema.prisma로 변환해줘. 50+ 모델, 관계, 인덱스 포함. PostgreSQL provider. UUID/DateTime 기본값."
 ```
 
----
+### Step 3: NestJS 프로젝트
+```
+"NestJS 프로젝트를 생성하고 다음 모듈 구조를 만들어줘: common (filters, guards, interceptors, decorators), modules (auth, spaces, work-items, documents, requirements, tests, traceability, compliance, workflows, notifications, search, mcp, upload, export, stakeholders, git, health). PrismaService, KeycloakService. ESLint + Prettier + Husky. Health Check + Winston."
+```
 
-## 13. Email 명세
+### Step 4: 모듈 구현 (각 모듈별)
+```
+"[Module]Service를 구현해줘. Just Enough Spec의 [Module] 섹션 참조.
+- CRUD + 비즈니스 로직
+- Prisma 쿼리 (include/select 최적화)
+- 에러 처리 (ErrorCodes)
+- Unit Test (Jest, Mock Prisma)
+- API 엔드포인트 (Controller)
+- DTO (class-validator)"
+```
 
-### 13.1 알림 유형
-- approval-request, status-change, mention, invitation, password-reset, registration-approved, registration-rejected
-
-### 13.2 발송 큐
-- Bull + Redis (비동기)
-- 재시도: 3회, 지수 백오프 (5초 → 10초 → 20초)
-
----
-
-## 14. Onboarding 명세
-
-### 14.1 신규 사용자 가이드
-- Step 1: 환영 + 역할 선택
-- Step 2: 프로젝트 생성 또는 참여
-- Step 3: 데모 프로젝트 체험
-- Step 4: 역할별 대시보드
-
-### 14.2 빈 프로젝트 가이드
-- "첫 번째 이슈를 만들어보세요" (CTA)
-- "문서 템플릿으로 SRS 작성하기" (CTA)
-- "팀원 초대하기" (CTA)
-
----
-
-## 15. Accessibility 명세
-
-### 15.1 WCAG 2.1 AA
-- 키보드 네비게이션, 포커스 표시, 색상 대비 4.5:1, 이미지 alt, 폼 라벨, 에러 메시지, ARIA role
-
-### 15.2 CI 검사
-- Lighthouse CI: 접근성 점수 90+
-- axe-core: 자동 테스트 (Playwright 연동)
-
----
-
-## 16. Monitoring 명세
-
-### 16.1 Health Check
-- GET /health → DB, Redis, Meilisearch, Keycloak, MinIO 상태
-
-### 16.2 Winston 로깅
-- JSON 구조화 로그, 파일 + 콘솔, 에러/combined 분리
-
----
-
-## 17. DB Backup 명세
-
-### 17.1 백업
-- pg_dump + gzip + MinIO 업로드 (일 1회, 자정)
-- 30일 보관 정책
-- Slack 알림
-
-### 17.2 복구
-- gunzip + psql (5~10분)
-- WAL 아카이빙 (Phase 3, Point-in-Time Recovery)
+### Step 5: Frontend
+```
+"React + Vite 프로젝트를 생성하고 다음을 구현해줘:
+- 라우팅 (React Router v6, 중첩 라우팅)
+- Keycloak 연동 (keycloak-js)
+- Zustand (auth, space, ui)
+- API 클라이언트 (axios + interceptor)
+- shadcn/ui + Tailwind
+- i18n (react-i18next)
+- 페이지: Login, Dashboard, Spaces, Issues, Documents, Traceability, Compliance"
+```
 
 ---
 
