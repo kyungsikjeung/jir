@@ -1,0 +1,242 @@
+// ============================================================
+// DBML: 사용자 인증 & 승인 워크플로우
+// 내부 직원 (회사 이메일 자동 인증) + 외부 직원 (관리자 승인) + 슈퍼관리자
+// ============================================================
+
+Project alm_auth_approval {
+  database_type: 'PostgreSQL'
+  Note: '내부: 회사 이메일 자동 인증 / 외부: 이메일 인증 + 관리자 승인 / 슈퍼관리자: 전체 관리'
+}
+
+// ── 조직 (회사) ─────────────────────────────────────────────
+Table organizations {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  name varchar(255) [not null]
+  slug varchar(100) [unique, not null]
+  domain varchar(255) [not null, note: '회사 이메일 도메인 (예: tovis.com)']
+  logo_url text
+  plan varchar(50) [default: 'free']
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  Note: '회사/조직. domain으로 내부/외부 구분'
+}
+
+// ── 사용자 ──────────────────────────────────────────────────
+Table users {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  org_id uuid [ref: > organizations.id]
+  email varchar(255) [unique, not null]
+  password_hash varchar(255)
+  display_name varchar(255) [not null]
+  avatar_url text
+  title varchar(100)
+  department varchar(100)
+  // 사용자 유형
+  user_type varchar(20) [not null, default: 'external', note: 'internal (회사 도메인) / external (외부)']
+  is_internal boolean [default: false, note: '회사 도메인 이메일 여부 (자동 판별)']
+  // 인증 상태
+  is_verified boolean [default: false, note: '이메일 인증 완료 여부']
+  is_approved boolean [default: false, note: '관리자 승인 완료 여부']
+  is_active boolean [default: true, note: '계정 활성화 여부 (관리자가 비활성화 가능)']
+  // 승인 정보
+  approved_by uuid [ref: > users.id, note: '승인한 관리자']
+  approved_at timestamptz
+  rejection_reason text
+  // 계약/만료 (외부 사용자)
+  contract_start date
+  contract_end date
+  is_temporary boolean [default: false]
+  // 메타
+  last_login_at timestamptz
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  Note: '내부: 회사 도메인 → 자동 승인 / 외부: 관리자 승인 필요'
+}
+
+// ── 사용자 등록 요청 (승인 대기열) ──────────────────────────
+Table registration_requests {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  org_id uuid [ref: > organizations.id, not null]
+  email varchar(255) [not null]
+  display_name varchar(255) [not null]
+  requested_role varchar(100) [note: '요청한 역할']
+  reason text [note: '가입 사유 (외부 사용자)']
+  // 이메일 인증
+  verification_token varchar(255) [unique]
+  verification_expires_at timestamptz
+  is_email_verified boolean [default: false]
+  // 승인
+  status varchar(30) [default: 'pending', note: 'pending, email_verified, approved, rejected, expired']
+  reviewed_by uuid [ref: > users.id, note: '검토한 관리자/슈퍼관리자']
+  reviewed_at timestamptz
+  review_comment text [note: '승인/거절 사유']
+  // 메타
+  ip_address inet
+  user_agent text
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  Note: '외부 사용자 가입 요청 → 이메일 인증 → 관리자 승인 플로우'
+}
+
+// ── 역할 (Role) ─────────────────────────────────────────────
+Table roles {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  org_id uuid [ref: > organizations.id]
+  name varchar(100) [not null]
+  description text
+  is_system boolean [default: false, note: '시스템 기본 역할 (삭제 불가)']
+  is_super_admin boolean [default: false, note: '슈퍼관리자 역할']
+  is_admin boolean [default: false, note: '관리자 역할 (사용자 승인 가능)']
+  created_at timestamptz [default: `now()`]
+
+  Indexes {
+    (org_id, name) [unique]
+  }
+
+  Note: '슈퍼관리자 > 관리자 > 일반 사용자 계층'
+}
+
+// ── 권한 (Permission) ───────────────────────────────────────
+Table permissions {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  code varchar(100) [unique, not null]
+  name varchar(255) [not null]
+  description text
+  category varchar(50) [not null, note: 'core, user, space, workitem, requirement, test, config, process, admin']
+  action varchar(20) [not null, note: 'create, read, update, delete, approve, manage']
+  resource varchar(50) [not null]
+  is_system boolean [default: false]
+
+  Note: '허용 액션 목록 (CRUD 등)'
+}
+
+// ── 역할-권한 매핑 ──────────────────────────────────────────
+Table role_permissions {
+  role_id uuid [ref: > roles.id, not null]
+  permission_id uuid [ref: > permissions.id, not null]
+  granted_at timestamptz [default: `now()`]
+
+  Indexes {
+    (role_id, permission_id) [pk]
+  }
+}
+
+// ── 사용자-역할 매핑 ────────────────────────────────────────
+Table user_roles {
+  user_id uuid [ref: > users.id, not null]
+  role_id uuid [ref: > roles.id, not null]
+  space_id uuid [ref: > spaces.id, note: '스페이스별 역할 (NULL=글로벌)']
+  granted_by uuid [ref: > users.id, note: '권한 부여자 (관리자/슈퍼관리자)']
+  granted_at timestamptz [default: `now()`]
+  expires_at timestamptz [note: '임시 권한 만료일']
+
+  Indexes {
+    (user_id, role_id, space_id) [pk]
+  }
+}
+
+// ── 스페이스 ────────────────────────────────────────────────
+Table spaces {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  org_id uuid [ref: > organizations.id, not null]
+  key varchar(20) [unique, not null]
+  name varchar(255) [not null]
+  description text
+  is_archived boolean [default: false]
+  created_by uuid [ref: > users.id]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+// ── 스페이스 멤버 ───────────────────────────────────────────
+Table space_members {
+  space_id uuid [ref: > spaces.id, not null]
+  user_id uuid [ref: > users.id, not null]
+  role_id uuid [ref: > roles.id, not null]
+  added_by uuid [ref: > users.id, note: '추가한 관리자']
+  added_at timestamptz [default: `now()`]
+
+  Indexes {
+    (space_id, user_id) [pk]
+  }
+}
+
+// ── 승인 이력 (Audit) ───────────────────────────────────────
+Table approval_audit_log {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  action varchar(30) [not null, note: 'register_request, email_verified, approved, rejected, role_granted, role_revoked, deactivated, activated']
+  target_user_id uuid [ref: > users.id, not null]
+  performed_by uuid [ref: > users.id, note: '수행자 (관리자/슈퍼관리자/시스템)']
+  // 상세
+  old_status varchar(30)
+  new_status varchar(30)
+  role_id uuid [ref: > roles.id]
+  comment text
+  ip_address inet
+  created_at timestamptz [default: `now()`]
+
+  Note: '모든 승인/권한 변경 이력 (증적)'
+}
+
+// ── 슈퍼관리자 전용: 시스템 설정 ───────────────────────────
+Table system_settings {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  org_id uuid [ref: > organizations.id]
+  key varchar(100) [not null]
+  value jsonb [not null]
+  description text
+  updated_by uuid [ref: > users.id]
+  updated_at timestamptz [default: `now()`]
+
+  Indexes {
+    (org_id, key) [unique]
+  }
+
+  Note: '슈퍼관리자가 관리하는 시스템 설정'
+}
+
+// ── 슈퍼관리자 전용: 감사 로그 (전체) ──────────────────────
+Table system_audit_log {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  org_id uuid [ref: > organizations.id]
+  action varchar(50) [not null]
+  entity_type varchar(50) [not null]
+  entity_id uuid
+  actor_id uuid [ref: > users.id]
+  actor_ip inet
+  details jsonb [default: '{}']
+  created_at timestamptz [default: `now()`]
+
+  Note: '슈퍼관리자 전용 전체 감사 로그'
+}
+
+// ── 시드 데이터: 역할 ───────────────────────────────────────
+// (org_id = NULL → 글로벌 템플릿, 조직 생성 시 복사)
+//
+// super_admin: is_super_admin=TRUE, is_admin=TRUE
+//   → 모든 권한 + 사용자 승인 + 시스템 설정 + 감사 로그
+//
+// admin: is_admin=TRUE
+//   → 사용자 승인 + 역할 부여 + 프로젝트 관리
+//
+// pm, se, qa, cm, viewer: 일반 역할
+
+// ── 시드 데이터: 권한 ───────────────────────────────────────
+// admin.* 카테고리 (슈퍼관리자/관리자 전용)
+//   user.approve      - 사용자 가입 승인/거절
+//   user.manage       - 사용자 생성/수정/삭제/비활성화
+//   user.role.grant   - 역할 부여
+//   user.role.revoke  - 역할 회수
+//   system.settings   - 시스템 설정 관리
+//   system.audit      - 전체 감사 로그 조회
+//   org.manage        - 조직 설정 관리
+//   space.create      - 프로젝트 생성
+//   space.manage      - 프로젝트 설정 관리
+//   space.delete      - 프로젝트 삭제
+//
+// 일반 권한 (core, workitem, requirement, test, config, process)
+//   *.view, *.create, *.edit, *.delete, *.approve 등
