@@ -119,7 +119,6 @@ export class AuthService {
   }
 
   async syncUser(keycloakUser: KeycloakUser): Promise<User> {
-    // Keycloak 사용자 → ALM User 동기화
     return this.prisma.user.upsert({
       where: { email: keycloakUser.email },
       update: { displayName: keycloakUser.name, lastLoginAt: new Date() },
@@ -128,7 +127,7 @@ export class AuthService {
         displayName: keycloakUser.name,
         isInternal: this.isInternalEmail(keycloakUser.email),
         isVerified: true,
-        isApproved: this.isInternalEmail(keycloakUser.email), // 내부는 자동 승인
+        isApproved: this.isInternalEmail(keycloakUser.email),
       },
     });
   }
@@ -152,41 +151,32 @@ export class AuthService {
 @Injectable()
 export class SpaceService {
   async createSpace(dto: CreateSpaceDto, userId: string): Promise<Space> {
-    // 1. 프로젝트 템플릿 조회
     const template = await this.prisma.projectTemplate.findUnique({
       where: { id: dto.templateId },
     });
 
-    // 2. Space 생성 + 자동 프로비저닝 (트랜잭션)
     return this.prisma.$transaction(async (tx) => {
       const space = await tx.space.create({
-        data: { key: dto.key, name: dto.name, orgId: dto.orgId, createdBy: userId },
+        data: { key: dto.key, name: dto.name, orgId: dto.orgId, createdById: userId },
       });
 
-      // 프로세스 영역 매핑
       await tx.spaceProcessArea.createMany({
         data: template.processCodes.map(code => ({
           spaceId: space.id, processCode: code, isApplicable: true,
         })),
       });
 
-      // 워크플로우 복제
       for (const wfId of template.workflowTemplateIds) {
         await this.cloneWorkflow(tx, wfId, space.id);
       }
 
-      // 페이지 템플릿 복제
       for (const ptId of template.pageTemplateIds) {
         await this.clonePageTemplate(tx, ptId, space.id);
       }
 
-      // 기본 역할 생성
       await this.createDefaultRoles(tx, space.id);
-
-      // 홈 페이지 생성
       await this.createHomePage(tx, space.id, userId);
 
-      // Space 설정 생성
       await tx.spaceSettings.create({
         data: { spaceId: space.id, aspiceLevel: template.aspiceLevel },
       });
@@ -202,18 +192,6 @@ export class SpaceService {
     if (!space) throw new NotFoundException(`Space not found: ${key}`);
     await this.cache.set(`space:${key}`, space, 300);
     return space;
-  }
-
-  async addMember(spaceKey: string, dto: AddMemberDto, grantedBy: string) {
-    const space = await this.getSpace(spaceKey);
-    return this.prisma.spaceMember.create({
-      data: {
-        spaceId: space.id,
-        userId: dto.userId,
-        roleId: dto.roleId,
-        addedBy: grantedBy,
-      },
-    });
   }
 }
 ```
@@ -244,7 +222,7 @@ PUT    /spaces/:key/settings      → 설정 수정
 export class WorkItemService {
   async create(dto: CreateWorkItemDto, userId: string): Promise<WorkItem> {
     const space = await this.spaceService.getSpace(dto.spaceKey);
-    const key = await this.generateKey(space.key); // ADAS-1, ADAS-2, ...
+    const key = await this.generateKey(space.key);
 
     const workItem = await this.prisma.workItem.create({
       data: {
@@ -261,15 +239,12 @@ export class WorkItemService {
         labels: dto.labels || [],
         aspiceProcess: dto.aspiceProcess,
         asilLevel: dto.asilLevel,
-        body: dto.body, // TipTap JSON
+        body: dto.body,
         bodyText: this.extractText(dto.body),
       },
     });
 
-    // Meilisearch 인덱싱 (비동기)
     this.searchService.indexDocument('work_items', workItem.id, workItem);
-
-    // 감사 로그
     await this.auditService.log('work_item', workItem.id, 'create', userId);
 
     return workItem;
@@ -281,13 +256,10 @@ export class WorkItemService {
     const transition = workflow.transitions.find(t => t.name === transitionName);
 
     if (!transition) throw new BadRequestException('Invalid transition');
-    if (!await this.permissionService.canTransition(userId, item, transition)) {
-      throw new ForbiddenException('Permission denied');
-    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.workflowTransitionHistory.create({
-        data: { workItemId: item.id, transitionId: transition.id, fromStateId: item.workflowStateId, toStateId: transition.toStateId, performedBy: userId, comment },
+        data: { workItemId: item.id, transitionId: transition.id, fromStateId: item.workflowStateId, toStateId: transition.toStateId, performedById: userId, comment },
       });
       return tx.workItem.update({
         where: { id: item.id },
@@ -295,7 +267,6 @@ export class WorkItemService {
       });
     });
 
-    // Suspect Link 처리
     if (transition.toState.isTerminal) {
       await this.traceabilityService.markSuspectLinks(item.id);
     }
@@ -330,7 +301,6 @@ export class DocumentService {
   async createPage(dto: CreatePageDto, userId: string): Promise<Page> {
     const space = await this.spaceService.getSpace(dto.spaceKey);
 
-    // 템플릿 적용
     let body = dto.body;
     if (dto.templateId) {
       const template = await this.prisma.pageTemplate.findUnique({ where: { id: dto.templateId } });
@@ -354,7 +324,6 @@ export class DocumentService {
       data: { workItemId: workItem.id, parentPageId: dto.parentId, templateId: dto.templateId },
     });
 
-    // 버전 1 생성
     await this.prisma.pageVersion.create({
       data: { pageId: workItem.id, version: 1, title: dto.title, body, authorId: userId },
     });
@@ -366,7 +335,6 @@ export class DocumentService {
     const page = await this.prisma.workItem.findUnique({ where: { id: pageId } });
     if (!page) throw new NotFoundException();
 
-    // 버전 증가
     const newVersion = page.version + 1;
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -380,7 +348,6 @@ export class DocumentService {
       return workItem;
     });
 
-    // Suspect Link 처리 (페이지 변경 시 연결된 항목 suspect)
     await this.traceabilityService.markSuspectLinks(pageId);
 
     return updated;
@@ -394,6 +361,8 @@ export class DocumentService {
 - `aspiceClauseBlock`: ASPICE 조항 체크리스트
 - `codeBlock`: 코드 블록 (syntax highlighting)
 - `table`: 표 (정렬, 셀 병합)
+- `mermaidBlock`: Mermaid 다이어그램 (코드 + 프리뷰)
+- `tocBlock`: 목차 자동 생성
 
 ---
 
@@ -423,7 +392,6 @@ export class RequirementService {
       },
     });
 
-    // 파생 관계 생성
     if (dto.derivedFromId) {
       await this.prisma.requirementRelation.create({
         data: { fromReqId: dto.derivedFromId, toReqId: workItem.id, relationType: 'derives' },
@@ -460,10 +428,7 @@ export class TraceabilityService {
 
   async getMatrix(spaceKey: string): Promise<TraceMatrix> {
     const space = await this.spaceService.getSpace(spaceKey);
-    const links = await this.prisma.traceLink.findMany({
-      where: { /* space 관련 */ },
-    });
-    // 매트릭스 데이터 구조화 (rows: requirements, cols: tests, cells: link 존재 여부)
+    const links = await this.prisma.traceLink.findMany();
     return this.buildMatrix(links);
   }
 
@@ -479,13 +444,12 @@ export class TraceabilityService {
     return {
       total: requirements.length,
       covered: covered.length,
-      percent: (covered.length / requirements.length) * 100,
+      percent: requirements.length > 0 ? (covered.length / requirements.length) * 100 : 0,
       uncovered: requirements.filter(r => !covered.includes(r)).map(r => r.key),
     };
   }
 
   async markSuspectLinks(changedItemId: string): Promise<void> {
-    // 변경된 항목을 from/to로 하는 링크를 suspect로 표시
     await this.prisma.traceLink.updateMany({
       where: { OR: [{ fromId: changedItemId }, { toId: changedItemId }] },
       data: { isSuspect: true },
@@ -496,194 +460,78 @@ export class TraceabilityService {
 
 ---
 
-### 2.7 MCP Module
+### 2.7 Workflows Module
 
-**책임**: MCP Server (SSE + JSON-RPC), Tool Registry, Resource Registry
+**책임**: 워크플로우 CRUD, 상태 전이, 리뷰, 승인, 전자 서명
 
 ```typescript
-// mcp.controller.ts
-@Controller('mcp')
-export class McpController {
-  @Sse('sse')
-  sseEndpoint(@Req() req: Request): Observable<MessageEvent> {
-    return this.mcpService.createSession(req);
-  }
-
-  @Post('message')
-  async handleMessage(@Body() request: JsonRpcRequest): Promise<JsonRpcResponse> {
-    const user = await this.authService.validateMcpToken(request);
-    const result = await this.mcpService.handleMethod(request.method, request.params, user);
-    return { jsonrpc: '2.0', id: request.id, result };
-  }
-}
-
-// mcp.service.ts
+// workflow.service.ts
 @Injectable()
-export class McpService {
-  private tools = new Map<string, McpToolHandler>();
+export class WorkflowService {
+  async executeTransition(workItemId: string, transitionName: string, userId: string, comment?: string) {
+    const item = await this.workItemService.getById(workItemId);
+    const workflow = await this.getWorkflow(item.spaceId, item.typeId);
+    const transition = workflow.transitions.find(t => t.name === transitionName);
 
-  constructor(/* services */) {
-    this.registerTools();
-  }
+    if (!transition) throw new BadRequestException('Invalid transition');
 
-  private registerTools() {
-    this.tools.set('alm_search_issues', async (args, user) => {
-      const issues = await this.workItemService.search(args.jql, args.maxResults, user);
-      return { content: [{ type: 'text', text: JSON.stringify(issues) }] };
-    });
-    // ... 20+ tools
-  }
-
-  async handleMethod(method: string, params: any, user: User): Promise<any> {
-    switch (method) {
-      case 'initialize': return { serverInfo: { name: 'alm-mcp-server', version: '1.0.0' } };
-      case 'tools/list': return { tools: this.getToolDefinitions() };
-      case 'tools/call': return this.executeTool(params.name, params.arguments, user);
-      case 'resources/list': return this.resourceRegistry.list(user);
-      case 'resources/read': return this.resourceRegistry.read(params.uri, user);
-      default: throw new Error(`Unknown method: ${method}`);
+    // 조건 체크
+    if (transition.conditionType === 'role_check') {
+      const config = transition.conditionConfig as { roles: string[] };
+      const userRoles = await this.userService.getRoles(userId, item.spaceId);
+      if (!config.roles.some(r => userRoles.includes(r))) {
+        throw new ForbiddenException('Role check failed');
+      }
     }
-  }
-}
-```
 
----
-
-### 2.8 Search Module (Meilisearch)
-
-**책임**: Meilisearch 연동, 인덱싱, 검색, 자동완성
-
-```typescript
-// search.service.ts
-@Injectable()
-export class SearchService {
-  private client = new MeiliSearch({
-    host: process.env.MEILI_HOST,
-    apiKey: process.env.MEILI_API_KEY,
-  });
-
-  async createIndex() {
-    const index = this.client.index('work_items');
-    await index.updateSettings({
-      searchableAttributes: ['title', 'bodyText', 'description'],
-      filterableAttributes: ['spaceKey', 'status', 'priority', 'aspiceProcess', 'asilLevel', 'type'],
-      sortableAttributes: ['createdAt', 'priority', 'updatedAt'],
-      rankingRules: ['words', 'typo', 'proximity', 'attribute', 'sort', 'exactness'],
-    });
-  }
-
-  async indexDocument(id: string, document: any) {
-    await this.client.index('work_items').addDocuments([{ id, ...document }]);
-  }
-
-  async search(query: string, filters?: string, limit = 50) {
-    return this.client.index('work_items').search(query, {
-      filter: filters,
-      limit,
-      attributesToHighlight: ['title', 'bodyText'],
-      highlightPreTag: '<mark>',
-      highlightPostTag: '</mark>',
-    });
-  }
-}
-```
-
----
-
-### 2.9 Notification Module
-
-**책임**: WebSocket 실시간 알림, 이메일 알림
-
-```typescript
-// notification.gateway.ts
-@WebSocketGateway({ cors: true })
-export class NotificationGateway {
-  @WebSocketServer()
-  server: Server;
-
-  async sendToUser(userId: string, notification: Notification) {
-    this.server.to(`user:${userId}`).emit('notification', notification);
-    // 이메일 알림 (비동기)
-    if (notification.emailEnabled) {
-      await this.emailService.send(notification);
-    }
-  }
-}
-
-// notification.service.ts
-@Injectable()
-export class NotificationService {
-  async notifyMention(comment: Comment, mentionedUsers: string[]) {
-    for (const userId of mentionedUsers) {
-      await this.gateway.sendToUser(userId, {
-        type: 'mention',
-        title: '멘션됨',
-        body: `${comment.author.displayName}님이 댓글에서 멘션했습니다`,
-        targetId: comment.targetId,
-        emailEnabled: true,
+    if (transition.conditionType === 'approval_count') {
+      const config = transition.conditionConfig as { minApprovers: number };
+      const approvals = await this.prisma.approval.count({
+        where: { entityType: 'work_item', entityId: workItemId, decision: 'approve' },
       });
-    }
-  }
-}
-```
-
----
-
-### 2.10 Upload Module (MinIO)
-
-**책임**: 파일 업로드, MIME 검증, 썸네일 생성
-
-```typescript
-// upload.service.ts
-@Injectable()
-export class UploadService {
-  private s3 = new S3Client({
-    endpoint: process.env.MINIO_ENDPOINT,
-    region: 'us-east-1',
-    credentials: {
-      accessKeyId: process.env.MINIO_USER,
-      secretAccessKey: process.env.MINIO_PASSWORD,
-    },
-    forcePathStyle: true,
-  });
-
-  async upload(file: Express.Multer.File, target: UploadTarget) {
-    // 1. MIME + Magic Number 검증
-    await this.validateFile(file);
-
-    // 2. MinIO 업로드
-    const path = `${target.type}/${target.id}/${Date.now()}_${file.originalname}`;
-    await this.s3.send(new PutObjectCommand({
-      Bucket: 'alm-attachments',
-      Key: path,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-    }));
-
-    // 3. 썸네일 생성 (이미지)
-    let thumbnailPath = null;
-    if (file.mimetype.startsWith('image/')) {
-      const thumb = await this.thumbnailService.generate(file.buffer);
-      thumbnailPath = `${target.type}/${target.id}/thumb_${Date.now()}.webp`;
-      await this.s3.send(new PutObjectCommand({
-        Bucket: 'alm-attachments',
-        Key: thumbnailPath,
-        Body: thumb,
-        ContentType: 'image/webp',
-      }));
+      if (approvals < config.minApprovers) {
+        throw new BadRequestException(`Need ${config.minApprovers} approvals, got ${approvals}`);
+      }
     }
 
-    // 4. DB 저장
-    return this.prisma.attachment.create({
-      data: { fileName: file.originalname, filePath: path, thumbnailPath, fileSize: file.size, mimeType: file.mimetype, targetId: target.id, targetType: target.type, uploadedBy: target.userId },
+    // 전이 실행
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.workflowTransitionHistory.create({
+        data: { workItemId, transitionId: transition.id, fromStateId: item.workflowStateId, toStateId: transition.toStateId, performedById: userId, comment },
+      });
+      return tx.workItem.update({
+        where: { id: workItemId },
+        data: { workflowStateId: transition.toStateId, status: transition.toState.category },
+      });
     });
+
+    // 사후 액션 실행
+    for (const action of transition.postActions as any[]) {
+      await this.executePostAction(action, item, userId);
+    }
+
+    return updated;
+  }
+
+  private async executePostAction(action: any, item: WorkItem, userId: string) {
+    switch (action.type) {
+      case 'notify':
+        await this.notificationService.sendToUsers(action.config.users, { type: 'status_change', targetId: item.id });
+        break;
+      case 'create_link':
+        await this.traceabilityService.createLink(action.config);
+        break;
+      case 'update_field':
+        await this.prisma.workItem.update({ where: { id: item.id }, data: { [action.config.field]: action.config.value } });
+        break;
+    }
   }
 }
 ```
 
 ---
 
-### 2.11 Compliance Module (ASPICE)
+### 2.8 Compliance Module (ASPICE)
 
 **책임**: ASPICE 컴플라이언스 대시보드, 체크리스트, 프로세스 평가
 
@@ -730,145 +578,488 @@ export class ComplianceService {
 
 ---
 
-## 3. Prisma 스키마 (핵심 모델)
+### 2.9 Stakeholders Module
 
-```prisma
-// prisma/schema.prisma
-generator client {
-  provider = "prisma-client-js"
+**책임**: 이해관계자 유형, 외부 조직, 접근 정책, 초대 관리
+
+```typescript
+// stakeholder.service.ts
+@Injectable()
+export class StakeholderService {
+  async checkAccess(user: User, space: Space, workItem: WorkItem | null, action: string): Promise<boolean> {
+    const profile = await this.prisma.userStakeholderProfile.findUnique({
+      where: { userId: user.id },
+      include: { stakeholderType: true, externalOrg: true },
+    });
+
+    if (!profile) return false;
+    if (profile.stakeholderType.isInternal) {
+      return this.permissionService.checkPermission(user.id, space.id, action);
+    }
+
+    const policy = await this.prisma.stakeholderAccessPolicy.findUnique({
+      where: { stakeholderTypeId_orgId: { stakeholderTypeId: profile.stakeholderTypeId, orgId: user.orgId } },
+    });
+
+    if (!policy || !policy.allowedActions.includes(action)) return false;
+    if (profile.restrictedSpaces.includes(space.id)) return false;
+    if (profile.allowedSpaces.length > 0 && !profile.allowedSpaces.includes(space.id)) return false;
+
+    if (workItem?.type === 'page' && policy.documentAccess !== 'all') {
+      const allowedStatuses = policy.documentAccess === 'released_only'
+        ? ['released'] : ['approved', 'released'];
+      if (!allowedStatuses.includes(workItem.status)) return false;
+    }
+
+    if (policy.requireNda && !profile.externalOrg?.hasNda) return false;
+
+    return true;
+  }
+
+  async invite(dto: InviteDto, invitedBy: string): Promise<Invitation> {
+    const token = crypto.randomUUID();
+    return this.prisma.invitation.create({
+      data: {
+        orgId: dto.orgId,
+        email: dto.email,
+        stakeholderTypeId: dto.stakeholderTypeId,
+        externalOrgId: dto.externalOrgId,
+        allowedSpaces: dto.allowedSpaces || [],
+        dataFilter: dto.dataFilter || {},
+        contractEnd: dto.contractEnd,
+        token,
+        expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000), // 72시간
+        invitedById: invitedBy,
+      },
+    });
+  }
 }
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model Organization {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  domain    String
-  plan      String   @default("free")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  spaces    Space[]
-  users     User[]
-}
-
-model User {
-  id           String   @id @default(uuid())
-  orgId        String
-  org          Organization @relation(fields: [orgId], references: [id])
-  email        String   @unique
-  passwordHash String?
-  displayName  String
-  avatarUrl    String?
-  title        String?
-  department   String?
-  isInternal   Boolean  @default(false)
-  isVerified   Boolean  @default(false)
-  isApproved   Boolean  @default(false)
-  isActive     Boolean  @default(true)
-  isExternal   Boolean  @default(false)
-  lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  roles        UserRole[]
-  spaces       SpaceMember[]
-  workItems    WorkItem[] @relation("assignee")
-  reported     WorkItem[] @relation("reporter")
-}
-
-model Space {
-  id          String   @id @default(uuid())
-  orgId       String
-  org         Organization @relation(fields: [orgId], references: [id])
-  key         String   @unique
-  name        String
-  description String?
-  isArchived  Boolean  @default(false)
-  createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  members     SpaceMember[]
-  workItems   WorkItem[]
-  settings    SpaceSettings?
-  @@index([orgId])
-  @@index([key])
-}
-
-model WorkItem {
-  id              String   @id @default(uuid())
-  spaceId         String
-  space           Space    @relation(fields: [spaceId], references: [id])
-  typeId          String
-  type            WorkItemType @relation(fields: [typeId], references: [id])
-  key             String
-  title           String
-  description     String?
-  status          String   @default("open")
-  priority        String   @default("medium")
-  assigneeId      String?
-  assignee        User?    @relation("assignee", fields: [assigneeId], references: [id])
-  reporterId      String?
-  reporter        User?    @relation("reporter", fields: [reporterId], references: [id])
-  parentId        String?
-  parent          WorkItem? @relation("parent", fields: [parentId], references: [id])
-  children        WorkItem[] @relation("parent")
-  workflowStateId  String?
-  workflowState   WorkflowState? @relation(fields: [workflowStateId], references: [id])
-  version         Int      @default(1)
-  body            Json?
-  bodyText        String?
-  labels          String[]
-  aspiceProcess   String?
-  asilLevel       String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  resolvedAt      DateTime?
-  @@unique([spaceId, key])
-  @@index([spaceId])
-  @@index([status])
-  @@index([assigneeId])
-  @@index([aspiceProcess])
-}
-
-// ... (나머지 모델은 DB 스키마에서 변환)
 ```
 
 ---
 
-## 4. 에러 코드 체계
+### 2.10 Git Module
+
+**책임**: GitHub/GitLab 연동, 스마트 커밋, PR 링크, CI/CD 연동
+
+```typescript
+// git.service.ts
+@Injectable()
+export class GitService {
+  async handleSmartCommit(commitMessage: string, userId: string): Promise<void> {
+    // 스마트 커밋 파싱: "ADAS-123 #done #comment Fixed the bug"
+    const issueKeyMatch = commitMessage.match(/([A-Z]+-\d+)/);
+    if (!issueKeyMatch) return;
+
+    const issueKey = issueKeyMatch[1];
+    const item = await this.workItemService.getByKey(issueKey);
+
+    // #done → 상태 전이
+    if (commitMessage.includes('#done') || commitMessage.includes('#resolve')) {
+      await this.workflowService.executeTransition(item.id, 'Done', userId, `Git commit: ${commitMessage}`);
+    }
+
+    // #comment → 코멘트 추가
+    const commentMatch = commitMessage.match(/#comment\s+(.+)/);
+    if (commentMatch) {
+      await this.commentService.add(item.id, userId, commentMatch[1]);
+    }
+
+    // #time → 작업 시간 기록
+    const timeMatch = commitMessage.match(/#time\s+(\d+)h/);
+    if (timeMatch) {
+      await this.workItemService.update(item.id, { actualHours: parseFloat(timeMatch[1]) });
+    }
+  }
+
+  async handlePullRequest(pr: PullRequestEvent): Promise<void> {
+    // PR → Work Item 자동 링크
+    const issueKeys = this.extractIssueKeys(pr.title + ' ' + pr.body);
+    for (const key of issueKeys) {
+      await this.workItemService.linkPullRequest(key, pr.url, pr.state);
+    }
+  }
+
+  async handleCiResult(ciResult: CiResultEvent): Promise<void> {
+    // CI/CD 결과 → Work Item 상태 업데이트
+    if (ciResult.status === 'success') {
+      // 빌드 성공 → 상태 전이 가능
+    } else if (ciResult.status === 'failure') {
+      // 빌드 실패 → 결함 생성
+      await this.defectService.create({
+        title: `CI Build Failed: ${ciResult.pipelineName}`,
+        description: ciResult.errorMessage,
+        severity: 'major',
+      });
+    }
+  }
+}
+```
+
+---
+
+### 2.11 Health Module
+
+**책임**: Health Check 엔드포인트, 시스템 상태 모니터링
+
+```typescript
+// health.controller.ts
+@Controller('health')
+export class HealthController {
+  @Get()
+  @HealthCheck()
+  check() {
+    return this.health.check([
+      () => this.db.pingCheck('database'),
+      () => this.redis.pingCheck('redis'),
+      () => this.http.pingCheck('meilisearch', 'http://meilisearch:7700/health'),
+      () => this.http.pingCheck('keycloak', 'http://keycloak:8080/health/ready'),
+      () => this.http.pingCheck('minio', 'http://minio:9000/minio/health/live'),
+    ]);
+  }
+
+  @Get('ready')
+  ready() {
+    return { status: 'ready', timestamp: new Date().toISOString() };
+  }
+}
+```
+
+---
+
+### 2.12 Export Module
+
+**책임**: Word, PDF, Excel, HTML Export
+
+```typescript
+// export.service.ts
+@Injectable()
+export class ExportService {
+  async exportToWord(documentId: string): Promise<Buffer> {
+    const doc = await this.documentService.getPage(documentId);
+    const docx = new Document({
+      sections: [{
+        children: [
+          new Paragraph({ text: doc.title, heading: HeadingLevel.HEADING_1 }),
+          ...this.convertTipTapToDocx(doc.body),
+        ],
+      }],
+    });
+    return Packer.toBuffer(docx);
+  }
+
+  async exportToPdf(documentId: string, userId: string, watermark?: string): Promise<Buffer> {
+    const html = await this.renderToHtml(documentId);
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.setContent(html);
+    const pdf = await page.pdf({ format: 'A4', displayHeaderFooter: true });
+    await browser.close();
+    if (watermark) return this.addWatermark(pdf, watermark);
+    return pdf;
+  }
+
+  async exportTraceabilityToExcel(spaceKey: string): Promise<Buffer> {
+    const matrix = await this.traceabilityService.getMatrix(spaceKey);
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Traceability Matrix');
+    sheet.addRow(['Requirement', 'Design', 'Code', 'Test Case', 'Status']);
+    matrix.rows.forEach(row => sheet.addRow([row.req, row.design, row.code, row.test, row.status]));
+    sheet.getRow(1).font = { bold: true };
+    return workbook.xlsx.writeBuffer();
+  }
+}
+```
+
+---
+
+### 2.13 Upload Module (MinIO)
+
+**책임**: 파일 업로드, MIME 검증, 썸네일 생성
+
+```typescript
+// upload.service.ts
+@Injectable()
+export class UploadService {
+  private s3 = new S3Client({
+    endpoint: process.env.MINIO_ENDPOINT,
+    region: 'us-east-1',
+    credentials: { accessKeyId: process.env.MINIO_USER, secretAccessKey: process.env.MINIO_PASSWORD },
+    forcePathStyle: true,
+  });
+
+  async upload(file: Express.Multer.File, target: UploadTarget) {
+    await this.validateFile(file);
+    const path = `${target.type}/${target.id}/${Date.now()}_${file.originalname}`;
+    await this.s3.send(new PutObjectCommand({ Bucket: 'alm-attachments', Key: path, Body: file.buffer, ContentType: file.mimetype }));
+
+    let thumbnailPath = null;
+    if (file.mimetype.startsWith('image/')) {
+      const thumb = await this.thumbnailService.generate(file.buffer);
+      thumbnailPath = `${target.type}/${target.id}/thumb_${Date.now()}.webp`;
+      await this.s3.send(new PutObjectCommand({ Bucket: 'alm-attachments', Key: thumbnailPath, Body: thumb, ContentType: 'image/webp' }));
+    }
+
+    return this.prisma.attachment.create({
+      data: { fileName: file.originalname, filePath: path, thumbnailPath, fileSize: file.size, mimeType: file.mimetype, targetId: target.id, targetType: target.type, uploadedById: target.userId },
+    });
+  }
+
+  private async validateFile(file: Express.Multer.File) {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/markdown'];
+    if (!allowed.includes(file.mimetype)) throw new BadRequestException('허용되지 않는 파일 형식');
+    if (file.size > 50 * 1024 * 1024) throw new BadRequestException('파일 크기가 50MB를 초과합니다');
+  }
+}
+```
+
+---
+
+### 2.14 Notification Module
+
+**책임**: WebSocket 실시간 알림, 이메일 알림
+
+```typescript
+// notification.gateway.ts
+@WebSocketGateway({ cors: true })
+export class NotificationGateway {
+  @WebSocketServer()
+  server: Server;
+
+  async sendToUser(userId: string, notification: Notification) {
+    this.server.to(`user:${userId}`).emit('notification', notification);
+    if (notification.emailEnabled) {
+      await this.emailService.send(notification);
+    }
+  }
+}
+
+// notification.service.ts
+@Injectable()
+export class NotificationService {
+  async notifyMention(comment: Comment, mentionedUsers: string[]) {
+    for (const userId of mentionedUsers) {
+      await this.gateway.sendToUser(userId, {
+        type: 'mention',
+        title: '멘션됨',
+        body: `${comment.author.displayName}님이 댓글에서 멘션했습니다`,
+        targetId: comment.targetId,
+        emailEnabled: true,
+      });
+    }
+  }
+
+  async notifyStatusChange(workItem: WorkItem, oldStatus: string, newStatus: string) {
+    const watchers = await this.prisma.workItemWatcher.findMany({ where: { workItemId: workItem.id } });
+    for (const watcher of watchers) {
+      await this.gateway.sendToUser(watcher.userId, {
+        type: 'status_change',
+        title: '상태 변경',
+        body: `${workItem.key}: ${oldStatus} → ${newStatus}`,
+        targetId: workItem.id,
+        emailEnabled: false,
+      });
+    }
+  }
+}
+```
+
+---
+
+### 2.15 Search Module (Meilisearch)
+
+**책임**: Meilisearch 연동, 인덱싱, 검색, 자동완성
+
+```typescript
+// search.service.ts
+@Injectable()
+export class SearchService {
+  private client = new MeiliSearch({
+    host: process.env.MEILI_HOST,
+    apiKey: process.env.MEILI_API_KEY,
+  });
+
+  async createIndex() {
+    const index = this.client.index('work_items');
+    await index.updateSettings({
+      searchableAttributes: ['title', 'bodyText', 'description'],
+      filterableAttributes: ['spaceKey', 'status', 'priority', 'aspiceProcess', 'asilLevel', 'type'],
+      sortableAttributes: ['createdAt', 'priority', 'updatedAt'],
+      rankingRules: ['words', 'typo', 'proximity', 'attribute', 'sort', 'exactness'],
+    });
+  }
+
+  async indexDocument(id: string, document: any) {
+    await this.client.index('work_items').addDocuments([{ id, ...document }]);
+  }
+
+  async search(query: string, filters?: string, limit = 50) {
+    return this.client.index('work_items').search(query, {
+      filter: filters,
+      limit,
+      attributesToHighlight: ['title', 'bodyText'],
+      highlightPreTag: '<mark>',
+      highlightPostTag: '</mark>',
+    });
+  }
+
+  async suggest(prefix: string) {
+    const result = await this.client.index('work_items').search(prefix, { limit: 5 });
+    return result.hits.map(h => h.title);
+  }
+}
+```
+
+---
+
+### 2.16 MCP Module
+
+**책임**: MCP Server (SSE + JSON-RPC), Tool Registry, Resource Registry
+
+```typescript
+// mcp.controller.ts
+@Controller('mcp')
+export class McpController {
+  @Sse('sse')
+  sseEndpoint(@Req() req: Request): Observable<MessageEvent> {
+    return this.mcpService.createSession(req);
+  }
+
+  @Post('message')
+  async handleMessage(@Body() request: JsonRpcRequest): Promise<JsonRpcResponse> {
+    const user = await this.authService.validateMcpToken(request);
+    const result = await this.mcpService.handleMethod(request.method, request.params, user);
+    return { jsonrpc: '2.0', id: request.id, result };
+  }
+}
+
+// mcp.service.ts
+@Injectable()
+export class McpService {
+  private tools = new Map<string, McpToolHandler>();
+
+  constructor() { this.registerTools(); }
+
+  private registerTools() {
+    this.tools.set('alm_search_issues', async (args, user) => {
+      const issues = await this.workItemService.search(args.jql, args.maxResults, user);
+      return { content: [{ type: 'text', text: JSON.stringify(issues) }] };
+    });
+    this.tools.set('alm_get_issue', async (args, user) => {
+      const issue = await this.workItemService.getByKey(args.issueKey, user);
+      return { content: [{ type: 'text', text: JSON.stringify(issue) }] };
+    });
+    this.tools.set('alm_create_issue', async (args, user) => {
+      const issue = await this.workItemService.create(args, user);
+      return { content: [{ type: 'text', text: `Created: ${issue.key}` }] };
+    });
+    this.tools.set('alm_add_comment', async (args, user) => {
+      await this.commentService.add(args.issueKey, user.id, args.body);
+      return { content: [{ type: 'text', text: 'Comment added' }] };
+    });
+    this.tools.set('alm_get_traceability', async (args, user) => {
+      const matrix = await this.traceabilityService.getMatrix(args.spaceKey);
+      return { content: [{ type: 'text', text: JSON.stringify(matrix) }] };
+    });
+    this.tools.set('alm_get_coverage', async (args, user) => {
+      const coverage = await this.traceabilityService.getCoverage(args.spaceKey);
+      return { content: [{ type: 'text', text: JSON.stringify(coverage) }] };
+    });
+    this.tools.set('alm_get_compliance_status', async (args, user) => {
+      const status = await this.complianceService.getSummary(args.spaceKey);
+      return { content: [{ type: 'text', text: JSON.stringify(status) }] };
+    });
+    this.tools.set('alm_create_baseline', async (args, user) => {
+      const baseline = await this.baselineService.create(args, user);
+      return { content: [{ type: 'text', text: `Baseline created: ${baseline.name}` }] };
+    });
+    this.tools.set('alm_search_pages', async (args, user) => {
+      const pages = await this.documentService.search(args.cql, user);
+      return { content: [{ type: 'text', text: JSON.stringify(pages) }] };
+    });
+    this.tools.set('alm_get_page', async (args, user) => {
+      const page = await this.documentService.getPage(args.pageId, user);
+      return { content: [{ type: 'text', text: JSON.stringify(page) }] };
+    });
+    this.tools.set('alm_create_page', async (args, user) => {
+      const page = await this.documentService.createPage(args, user);
+      return { content: [{ type: 'text', text: `Page created: ${page.title}` }] };
+    });
+    this.tools.set('alm_get_project_summary', async (args, user) => {
+      const summary = await this.spaceService.getSummary(args.spaceKey);
+      return { content: [{ type: 'text', text: JSON.stringify(summary) }] };
+    });
+  }
+
+  async handleMethod(method: string, params: any, user: User): Promise<any> {
+    switch (method) {
+      case 'initialize': return { serverInfo: { name: 'alm-mcp-server', version: '1.0.0' } };
+      case 'tools/list': return { tools: this.getToolDefinitions() };
+      case 'tools/call': return this.executeTool(params.name, params.arguments, user);
+      case 'resources/list': return this.resourceRegistry.list(user);
+      case 'resources/read': return this.resourceRegistry.read(params.uri, user);
+      default: throw new Error(`Unknown method: ${method}`);
+    }
+  }
+}
+```
+
+---
+
+## 3. 에러 코드 체계
 
 ```typescript
 // common/errors/error-codes.ts
 export const ErrorCodes = {
-  // Space
+  // Space (1000)
   SPACE_NOT_FOUND: { code: 'ALM-1001', message: '프로젝트를 찾을 수 없습니다', status: 404 },
   SPACE_KEY_EXISTS: { code: 'ALM-1002', message: '이미 존재하는 프로젝트 키입니다', status: 409 },
   SPACE_ACCESS_DENIED: { code: 'ALM-1003', message: '프로젝트 접근 권한이 없습니다', status: 403 },
+  SPACE_ARCHIVED: { code: 'ALM-1004', message: '아카이브된 프로젝트입니다', status: 400 },
 
-  // Work Item
+  // Work Item (2000)
   WORK_ITEM_NOT_FOUND: { code: 'ALM-2001', message: '워크 아이템을 찾을 수 없습니다', status: 404 },
   INVALID_TRANSITION: { code: 'ALM-2002', message: '유효하지 않은 상태 전이입니다', status: 400 },
   PERMISSION_DENIED: { code: 'ALM-2003', message: '권한이 없습니다', status: 403 },
+  WORK_ITEM_LOCKED: { code: 'ALM-2004', message: '편집 잠금 상태입니다', status: 423 },
+  PARENT_NOT_FOUND: { code: 'ALM-2005', message: '부모 항목을 찾을 수 없습니다', status: 404 },
 
-  // Auth
+  // Auth (3000)
   UNAUTHORIZED: { code: 'ALM-3001', message: '인증이 필요합니다', status: 401 },
   APPROVAL_PENDING: { code: 'ALM-3002', message: '관리자 승인 대기 중입니다', status: 403 },
   EMAIL_NOT_VERIFIED: { code: 'ALM-3003', message: '이메일 인증이 필요합니다', status: 403 },
+  ACCOUNT_DEACTIVATED: { code: 'ALM-3004', message: '계정이 비활성화되었습니다', status: 403 },
+  INVALID_TOKEN: { code: 'ALM-3005', message: '유효하지 않은 토큰입니다', status: 401 },
+  NDA_REQUIRED: { code: 'ALM-3006', message: 'NDA 서명이 필요합니다', status: 403 },
 
-  // Upload
+  // Upload (4000)
   FILE_TOO_LARGE: { code: 'ALM-4001', message: '파일 크기가 50MB를 초과합니다', status: 413 },
   INVALID_FILE_TYPE: { code: 'ALM-4002', message: '허용되지 않는 파일 형식입니다', status: 415 },
+  MAGIC_NUMBER_MISMATCH: { code: 'ALM-4003', message: '파일 형식이 일치하지 않습니다', status: 400 },
+
+  // Traceability (5000)
+  TRACE_LINK_EXISTS: { code: 'ALM-5001', message: '이미 존재하는 추적성 링크입니다', status: 409 },
+  SUSPECT_LINK_UNRESOLVED: { code: 'ALM-5002', message: '미해결 Suspect Link가 있습니다', status: 400 },
+
+  // Workflow (6000)
+  WORKFLOW_NOT_FOUND: { code: 'ALM-6001', message: '워크플로우를 찾을 수 없습니다', status: 404 },
+  CONDITION_NOT_MET: { code: 'ALM-6002', message: '전이 조건이 충족되지 않았습니다', status: 400 },
+  APPROVAL_INSUFFICIENT: { code: 'ALM-6003', message: '승인 수가 부족합니다', status: 400 },
+
+  // Compliance (7000)
+  PROCESS_NOT_FOUND: { code: 'ALM-7001', message: '프로세스를 찾을 수 없습니다', status: 404 },
+  DELIVERABLE_NOT_FOUND: { code: 'ALM-7002', message: '산출물을 찾을 수 없습니다', status: 404 },
+
+  // General (9000)
+  VALIDATION_ERROR: { code: 'ALM-9001', message: '입력 값이 유효하지 않습니다', status: 400 },
+  INTERNAL_ERROR: { code: 'ALM-9002', message: '서버 오류가 발생했습니다', status: 500 },
+  RATE_LIMIT_EXCEEDED: { code: 'ALM-9003', message: '요청 한도를 초과했습니다', status: 429 },
 } as const;
 ```
 
 ---
 
-## 5. 환경변수 (.env.example)
+## 4. 환경변수 (.env.example)
 
 ```env
 # Database
@@ -913,7 +1104,7 @@ FRONTEND_URL=http://localhost:5173
 
 ---
 
-## 6. 개발 시작 순서
+## 5. 개발 시작 순서
 
 ```
 Step 1: 인프라 (Docker Compose)
@@ -944,7 +1135,7 @@ Step 5: 통합 테스트
 
 ---
 
-## 7. AI 프롬프트 (구현 시작)
+## 6. AI 프롬프트 (구현 시작)
 
 ### Step 1: Docker Compose
 ```
@@ -971,11 +1162,12 @@ Step 5: 통합 테스트
 ```
 "NestJS 프로젝트를 생성하고 다음 모듈 구조를 만들어줘.
 - common: filters, guards, interceptors, decorators
-- modules: auth, spaces, work-items, documents, requirements, tests, traceability, compliance, workflows, notifications, search, mcp, upload, health
+- modules: auth, spaces, work-items, documents, requirements, tests, traceability, compliance, workflows, notifications, search, mcp, upload, health, stakeholders, git, export
 - PrismaService, KeycloakService
-- ESLint + Prettier + Husky 설정"
+- ESLint + Prettier + Husky 설정
+- Health Check + Winston 로깅"
 ```
 
 ---
 
-**이 SPEC.md를 기반으로 개발을 시작할 수 있습니다. 어떤 Step부터 시작하시겠어요?**
+**이 SPEC.md를 기반으로 개발을 시작할 수 있습니다. Step 1 (Docker Compose + 인프라)부터 시작하시겠어요?**
