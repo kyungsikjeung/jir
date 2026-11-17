@@ -1,0 +1,1262 @@
+﻿Prisma schema loaded from prisma\schema.prisma
+node.exe : Error: Prisma schema validation - (get-dmmf wasm)
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:\nvm4w\nodejs/node_modules/npm/bin/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error: Prisma s...(get-dmmf wasm):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Error code: P1012
+[1;91merror[0m: [1mError validating field `org` in model `Role`: The relation field `org` on model `Role` is missing
+ an opposite relation field on the model `Organization`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:72[0m
+[1;94m   | [0m
+[1;94m71 | [0m  orgId       String?
+[1;94m72 | [0m  [1;91morg         Organization? @relation(fields: [orgId], references: [id])
+[0m
+[1;94m73 | [0m  name        String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `UserRole`: The relation field `space` on model `UserRole
+` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:115[0m
+[1;94m   | [0m
+[1;94m114 | [0m  spaceId    String?
+[1;94m115 | [0m  [1;91mspace      Space?   @relation(fields: [spaceId], references: [id])
+[0m
+[1;94m116 | [0m  grantedBy  String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `Space`: The relation field `createdBy` on model `Spa
+ce` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:140[0m
+[1;94m   | [0m
+[1;94m139 | [0m  createdById      String?
+[1;94m140 | [0m  [1;91mcreatedBy        User?    @relation("spaceCreatedBy", fields: [createdById], references: [id]
+)
+[0m
+[1;94m141 | [0m  createdAt        DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `role` in model `SpaceMember`: The relation field `role` on model `SpaceMe
+mber` is missing an opposite relation field on the model `Role`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:160[0m
+[1;94m   | [0m
+[1;94m159 | [0m  roleId    String
+[1;94m160 | [0m  [1;91mrole      Role   @relation(fields: [roleId], references: [id])
+[0m
+[1;94m161 | [0m  addedById String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `addedBy` in model `SpaceMember`: The relation field `addedBy` on model `S
+paceMember` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[
+0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:162[0m
+[1;94m   | [0m
+[1;94m161 | [0m  addedById String?
+[1;94m162 | [0m  [1;91maddedBy   User?  @relation("addedBy", fields: [addedById], references: [id])
+[0m
+[1;94m163 | [0m  addedAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `leadUser` in model `Component`: The relation field `leadUser` on model `C
+omponent` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:191[0m
+[1;94m   | [0m
+[1;94m190 | [0m  leadUserId  String?
+[1;94m191 | [0m  [1;91mleadUser    User?    @relation(fields: [leadUserId], references: [id])
+[0m
+[1;94m192 | [0m  createdAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `WorkItemType`: The relation field `space` on model `Work
+ItemType` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0
+m
+  [1;94m-->[0m  [4mprisma\schema.prisma:227[0m
+[1;94m   | [0m
+[1;94m226 | [0m  spaceId        String
+[1;94m227 | [0m  [1;91mspace          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m228 | [0m  name           String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `comments` in model `WorkItem`: The relation field `comments` on model `Wo
+rkItem` is missing an opposite relation field on the model `Comment`. Either run `prisma format` or add it manually.[0
+m
+  [1;94m-->[0m  [4mprisma\schema.prisma:278[0m
+[1;94m   | [0m
+[1;94m277 | [0m  watchers        WorkItemWatcher[]
+[1;94m278 | [0m  [1;91mcomments        Comment[]
+[0m
+[1;94m279 | [0m  attachments     Attachment[]
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `attachments` in model `WorkItem`: The relation field `attachments` on mod
+el `WorkItem` is missing an opposite relation field on the model `Attachment`. Either run `prisma format` or add it man
+ually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:279[0m
+[1;94m   | [0m
+[1;94m278 | [0m  comments        Comment[]
+[1;94m279 | [0m  [1;91mattachments     Attachment[]
+[0m
+[1;94m280 | [0m  linksFrom       WorkItemLink[] @relation("from")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `WorkItemLink`: The relation field `createdBy` on mod
+el `WorkItemLink` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manua
+lly.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:303[0m
+[1;94m   | [0m
+[1;94m302 | [0m  createdById String?
+[1;94m303 | [0m  [1;91mcreatedBy   User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m304 | [0m  createdAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `changedBy` in model `WorkItemVersion`: The relation field `changedBy` on 
+model `WorkItemVersion` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it
+ manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:320[0m
+[1;94m   | [0m
+[1;94m319 | [0m  changedById   String?
+[1;94m320 | [0m  [1;91mchangedBy     User?    @relation(fields: [changedById], references: [id])
+[0m
+[1;94m321 | [0m  changeSummary String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `WorkItemWatcher`: The relation field `user` on model `Wor
+kItemWatcher` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.
+[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:332[0m
+[1;94m   | [0m
+[1;94m331 | [0m  userId     String
+[1;94m332 | [0m  [1;91muser       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m333 | [0m  addedAt    DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `parentPage` in model `Page`: The relation field `parentPage` on model `Pa
+ge` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:346[0m
+[1;94m   | [0m
+[1;94m345 | [0m  parentPageId  String?
+[1;94m346 | [0m  [1;91mparentPage    WorkItem? @relation("pageParent", fields: [parentPageId], references: [id])
+[0m
+[1;94m347 | [0m  templateId    String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `PageTemplate`: The relation field `space` on model `Page
+Template` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0
+m
+  [1;94m-->[0m  [4mprisma\schema.prisma:358[0m
+[1;94m   | [0m
+[1;94m357 | [0m  spaceId        String?
+[1;94m358 | [0m  [1;91mspace          Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m359 | [0m  name           String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `PageTemplate`: The relation field `createdBy` on mod
+el `PageTemplate` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manua
+lly.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:366[0m
+[1;94m   | [0m
+[1;94m365 | [0m  createdById    String?
+[1;94m366 | [0m  [1;91mcreatedBy      User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m367 | [0m  createdAt      DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `pages` in model `PageTemplate`: The relation field `pages` on model `Page
+Template` is missing an opposite relation field on the model `Page`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:368[0m
+[1;94m   | [0m
+[1;94m367 | [0m  createdAt      DateTime @default(now())
+[1;94m368 | [0m  [1;91mpages          Page[]
+[0m
+[1;94m369 | [0m  @@map("page_templates")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `author` in model `Comment`: The relation field `author` on model `Comment
+` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:380[0m
+[1;94m   | [0m
+[1;94m379 | [0m  authorId      String
+[1;94m380 | [0m  [1;91mauthor        User     @relation(fields: [authorId], references: [id])
+[0m
+[1;94m381 | [0m  body          String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `resolvedBy` in model `Comment`: The relation field `resolvedBy` on model 
+`Comment` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:387[0m
+[1;94m   | [0m
+[1;94m386 | [0m  resolvedById  String?
+[1;94m387 | [0m  [1;91mresolvedBy    User?    @relation("resolver", fields: [resolvedById], references: [id])
+[0m
+[1;94m388 | [0m  resolvedAt    DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `CommentReaction`: The relation field `user` on model `Com
+mentReaction` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.
+[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:401[0m
+[1;94m   | [0m
+[1;94m400 | [0m  userId    String
+[1;94m401 | [0m  [1;91muser      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m402 | [0m  emoji     String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `uploadedBy` in model `Attachment`: The relation field `uploadedBy` on mod
+el `Attachment` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manuall
+y.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:418[0m
+[1;94m   | [0m
+[1;94m417 | [0m  uploadedById  String
+[1;94m418 | [0m  [1;91muploadedBy    User     @relation(fields: [uploadedById], references: [id])
+[0m
+[1;94m419 | [0m  uploadedAt    DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `derivedFrom` in model `Requirement`: The relation field `derivedFrom` on 
+model `Requirement` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it
+ manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:439[0m
+[1;94m   | [0m
+[1;94m438 | [0m  derivedFromId      String?
+[1;94m439 | [0m  [1;91mderivedFrom        WorkItem? @relation("derivedFrom", fields: [derivedFromId], references: [i
+d])
+[0m
+[1;94m440 | [0m  reviewStatus       String   @default("draft")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `approvedBy` in model `Requirement`: The relation field `approvedBy` on mo
+del `Requirement` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manua
+lly.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:442[0m
+[1;94m   | [0m
+[1;94m441 | [0m  approvedById       String?
+[1;94m442 | [0m  [1;91mapprovedBy         User?    @relation(fields: [approvedById], references: [id])
+[0m
+[1;94m443 | [0m  approvedAt         DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `relationsFrom` in model `Requirement`: The relation field `relationsFrom`
+ on model `Requirement` is missing an opposite relation field on the model `RequirementRelation`. Either run `prisma fo
+rmat` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:449[0m
+[1;94m   | [0m
+[1;94m448 | [0m  attributes         RequirementAttribute[]
+[1;94m449 | [0m  [1;91mrelationsFrom      RequirementRelation[] @relation("fromReq")
+[0m
+[1;94m450 | [0m  relationsTo        RequirementRelation[] @relation("toReq")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `relationsTo` in model `Requirement`: The relation field `relationsTo` on 
+model `Requirement` is missing an opposite relation field on the model `RequirementRelation`. Either run `prisma format
+` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:450[0m
+[1;94m   | [0m
+[1;94m449 | [0m  relationsFrom      RequirementRelation[] @relation("fromReq")
+[1;94m450 | [0m  [1;91mrelationsTo        RequirementRelation[] @relation("toReq")
+[0m
+[1;94m451 | [0m  changeHistory      RequirementChangeHistory[]
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `changeHistory` in model `Requirement`: The relation field `changeHistory`
+ on model `Requirement` is missing an opposite relation field on the model `RequirementChangeHistory`. Either run `pris
+ma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:451[0m
+[1;94m   | [0m
+[1;94m450 | [0m  relationsTo        RequirementRelation[] @relation("toReq")
+[1;94m451 | [0m  [1;91mchangeHistory      RequirementChangeHistory[]
+[0m
+[1;94m452 | [0m  @@map("requirements")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `fromReq` in model `RequirementRelation`: The relation field `fromReq` on 
+model `RequirementRelation` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` o
+r add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:467[0m
+[1;94m   | [0m
+[1;94m466 | [0m  fromReqId    String
+[1;94m467 | [0m  [1;91mfromReq      WorkItem @relation("fromReq", fields: [fromReqId], references: [id], onDelete: C
+ascade)
+[0m
+[1;94m468 | [0m  toReqId      String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `toReq` in model `RequirementRelation`: The relation field `toReq` on mode
+l `RequirementRelation` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or ad
+d it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:469[0m
+[1;94m   | [0m
+[1;94m468 | [0m  toReqId      String
+[1;94m469 | [0m  [1;91mtoReq        WorkItem @relation("toReq", fields: [toReqId], references: [id], onDelete: Casca
+de)
+[0m
+[1;94m470 | [0m  relationType String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `RequirementRelation`: The relation field `createdBy`
+ on model `RequirementRelation` is missing an opposite relation field on the model `User`. Either run `prisma format` o
+r add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:472[0m
+[1;94m   | [0m
+[1;94m471 | [0m  createdById  String?
+[1;94m472 | [0m  [1;91mcreatedBy    User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m473 | [0m  createdAt    DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `TestSuite`: The relation field `space` on model `TestSui
+te` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:500[0m
+[1;94m   | [0m
+[1;94m499 | [0m  spaceId     String
+[1;94m500 | [0m  [1;91mspace       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m501 | [0m  name        String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `TestSuite`: The relation field `createdBy` on model 
+`TestSuite` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[
+0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:507[0m
+[1;94m   | [0m
+[1;94m506 | [0m  createdById String?
+[1;94m507 | [0m  [1;91mcreatedBy   User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m508 | [0m  createdAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `testCase` in model `TestSuiteCase`: The relation field `testCase` on mode
+l `TestSuiteCase` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it m
+anually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:518[0m
+[1;94m   | [0m
+[1;94m517 | [0m  testCaseId String
+[1;94m518 | [0m  [1;91mtestCase   WorkItem  @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+[0m
+[1;94m519 | [0m  position   Int      @default(0)
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `TestRun`: The relation field `space` on model `TestRun` 
+is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:527[0m
+[1;94m   | [0m
+[1;94m526 | [0m  spaceId      String
+[1;94m527 | [0m  [1;91mspace        Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m528 | [0m  name         String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `assignedTo` in model `TestRun`: The relation field `assignedTo` on model 
+`TestRun` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:538[0m
+[1;94m   | [0m
+[1;94m537 | [0m  assignedToId String?
+[1;94m538 | [0m  [1;91massignedTo   User?    @relation("testRunAssigned", fields: [assignedToId], references: [id])
+[0m
+[1;94m539 | [0m  startedAt    DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `TestRun`: The relation field `createdBy` on model `T
+estRun` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:542[0m
+[1;94m   | [0m
+[1;94m541 | [0m  createdById  String?
+[1;94m542 | [0m  [1;91mcreatedBy    User?    @relation("testRunCreated", fields: [createdById], references: [id])
+[0m
+[1;94m543 | [0m  createdAt    DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `testCase` in model `TestResult`: The relation field `testCase` on model `
+TestResult` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it manuall
+y.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:555[0m
+[1;94m   | [0m
+[1;94m554 | [0m  testCaseId       String
+[1;94m555 | [0m  [1;91mtestCase         WorkItem @relation(fields: [testCaseId], references: [id], onDelete: Cascade
+)
+[0m
+[1;94m556 | [0m  result           String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `executedBy` in model `TestResult`: The relation field `executedBy` on mod
+el `TestResult` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manuall
+y.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:560[0m
+[1;94m   | [0m
+[1;94m559 | [0m  executedById     String?
+[1;94m560 | [0m  [1;91mexecutedBy       User?    @relation(fields: [executedById], references: [id])
+[0m
+[1;94m561 | [0m  executedAt       DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `defect` in model `TestResult`: The relation field `defect` on model `Test
+Result` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it manually.[
+0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:564[0m
+[1;94m   | [0m
+[1;94m563 | [0m  defectId         String?
+[1;94m564 | [0m  [1;91mdefect           WorkItem? @relation("defectResult", fields: [defectId], references: [id])
+[0m
+[1;94m565 | [0m  retryCount       Int      @default(0)
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `testCase` in model `TestCoverage`: The relation field `testCase` on model
+ `TestCoverage` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it man
+ually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:574[0m
+[1;94m   | [0m
+[1;94m573 | [0m  testCaseId     String
+[1;94m574 | [0m  [1;91mtestCase       WorkItem @relation("testCaseCoverage", fields: [testCaseId], references: [id],
+ onDelete: Cascade)
+[0m
+[1;94m575 | [0m  requirementId  String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `requirement` in model `TestCoverage`: The relation field `requirement` on
+ model `TestCoverage` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add 
+it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:576[0m
+[1;94m   | [0m
+[1;94m575 | [0m  requirementId  String
+[1;94m576 | [0m  [1;91mrequirement    WorkItem @relation("reqCoverage", fields: [requirementId], references: [id], o
+nDelete: Cascade)
+[0m
+[1;94m577 | [0m  coverageType   String   @default("verifies")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `fromItem` in model `TraceLink`: The relation field `fromItem` on model `T
+raceLink` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it manually.
+[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:607[0m
+[1;94m   | [0m
+[1;94m606 | [0m  fromId      String
+[1;94m607 | [0m  [1;91mfromItem    WorkItem? @relation("traceFrom", fields: [fromId], references: [id])
+[0m
+[1;94m608 | [0m  toType      String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `toItem` in model `TraceLink`: The relation field `toItem` on model `Trace
+Link` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:610[0m
+[1;94m   | [0m
+[1;94m609 | [0m  toId        String
+[1;94m610 | [0m  [1;91mtoItem      WorkItem? @relation("traceTo", fields: [toId], references: [id])
+[0m
+[1;94m611 | [0m  linkType    String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `TraceLink`: The relation field `createdBy` on model 
+`TraceLink` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[
+0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:614[0m
+[1;94m   | [0m
+[1;94m613 | [0m  createdById String?
+[1;94m614 | [0m  [1;91mcreatedBy   User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m615 | [0m  createdAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `markedBy` in model `SuspectLink`: The relation field `markedBy` on model 
+`SuspectLink` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.
+[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:634[0m
+[1;94m   | [0m
+[1;94m633 | [0m  markedById   String?
+[1;94m634 | [0m  [1;91mmarkedBy     User?    @relation("markedBy", fields: [markedById], references: [id])
+[0m
+[1;94m635 | [0m  resolvedAt   DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `resolvedBy` in model `SuspectLink`: The relation field `resolvedBy` on mo
+del `SuspectLink` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manua
+lly.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:637[0m
+[1;94m   | [0m
+[1;94m636 | [0m  resolvedById String?
+[1;94m637 | [0m  [1;91mresolvedBy   User?    @relation("resolvedBy", fields: [resolvedById], references: [id])
+[0m
+[1;94m638 | [0m  resolution   String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `TraceMatrixSnapshot`: The relation field `space` on mode
+l `TraceMatrixSnapshot` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add i
+t manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:645[0m
+[1;94m   | [0m
+[1;94m644 | [0m  spaceId             String
+[1;94m645 | [0m  [1;91mspace               Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade
+)
+[0m
+[1;94m646 | [0m  baselineId          String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `generatedBy` in model `TraceMatrixSnapshot`: The relation field `generate
+dBy` on model `TraceMatrixSnapshot` is missing an opposite relation field on the model `User`. Either run `prisma forma
+t` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:654[0m
+[1;94m   | [0m
+[1;94m653 | [0m  generatedById       String?
+[1;94m654 | [0m  [1;91mgeneratedBy         User?    @relation(fields: [generatedById], references: [id])
+[0m
+[1;94m655 | [0m  generatedAt         DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `CoverageReport`: The relation field `space` on model `Co
+verageReport` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually
+.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:662[0m
+[1;94m   | [0m
+[1;94m661 | [0m  spaceId         String
+[1;94m662 | [0m  [1;91mspace           Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m663 | [0m  baselineId      String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `generatedBy` in model `CoverageReport`: The relation field `generatedBy` 
+on model `CoverageReport` is missing an opposite relation field on the model `User`. Either run `prisma format` or add 
+it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:671[0m
+[1;94m   | [0m
+[1;94m670 | [0m  generatedById   String?
+[1;94m671 | [0m  [1;91mgeneratedBy     User?    @relation(fields: [generatedById], references: [id])
+[0m
+[1;94m672 | [0m  generatedAt     DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `Baseline`: The relation field `space` on model `Baseline
+` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:683[0m
+[1;94m   | [0m
+[1;94m682 | [0m  spaceId       String
+[1;94m683 | [0m  [1;91mspace         Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m684 | [0m  name          String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `approvedBy` in model `Baseline`: The relation field `approvedBy` on model
+ `Baseline` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[
+0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:691[0m
+[1;94m   | [0m
+[1;94m690 | [0m  approvedById  String?
+[1;94m691 | [0m  [1;91mapprovedBy    User?    @relation("baselineApproved", fields: [approvedById], references: [id]
+)
+[0m
+[1;94m692 | [0m  approvedAt    DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `Baseline`: The relation field `createdBy` on model `
+Baseline` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:695[0m
+[1;94m   | [0m
+[1;94m694 | [0m  createdById   String?
+[1;94m695 | [0m  [1;91mcreatedBy     User?    @relation("baselineCreated", fields: [createdById], references: [id])
+[0m
+[1;94m696 | [0m  createdAt     DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `ConfigurationItem`: The relation field `space` on model 
+`ConfigurationItem` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it ma
+nually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:724[0m
+[1;94m   | [0m
+[1;94m723 | [0m  spaceId        String
+[1;94m724 | [0m  [1;91mspace          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m725 | [0m  ciType         String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `owner` in model `ConfigurationItem`: The relation field `owner` on model 
+`ConfigurationItem` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it man
+ually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:733[0m
+[1;94m   | [0m
+[1;94m732 | [0m  ownerId        String?
+[1;94m733 | [0m  [1;91mowner          User?    @relation(fields: [ownerId], references: [id])
+[0m
+[1;94m734 | [0m  createdAt      DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `Release`: The relation field `space` on model `Release` 
+is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:766[0m
+[1;94m   | [0m
+[1;94m765 | [0m  spaceId     String
+[1;94m766 | [0m  [1;91mspace       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m767 | [0m  name        String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `baseline` in model `Release`: The relation field `baseline` on model `Rel
+ease` is missing an opposite relation field on the model `Baseline`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:773[0m
+[1;94m   | [0m
+[1;94m772 | [0m  baselineId  String?
+[1;94m773 | [0m  [1;91mbaseline    Baseline? @relation(fields: [baselineId], references: [id])
+[0m
+[1;94m774 | [0m  createdById String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `Release`: The relation field `createdBy` on model `R
+elease` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:775[0m
+[1;94m   | [0m
+[1;94m774 | [0m  createdById String?
+[1;94m775 | [0m  [1;91mcreatedBy   User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m776 | [0m  createdAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `Workflow`: The relation field `space` on model `Workflow
+` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:788[0m
+[1;94m   | [0m
+[1;94m787 | [0m  spaceId       String?
+[1;94m788 | [0m  [1;91mspace         Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m789 | [0m  name          String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `Workflow`: The relation field `createdBy` on model `
+Workflow` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:795[0m
+[1;94m   | [0m
+[1;94m794 | [0m  createdById   String?
+[1;94m795 | [0m  [1;91mcreatedBy     User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m796 | [0m  createdAt     DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `workItems` in model `WorkflowState`: The relation field `workItems` on mo
+del `WorkflowState` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it
+ manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:814[0m
+[1;94m   | [0m
+[1;94m813 | [0m  isTerminal  Boolean  @default(false)
+[1;94m814 | [0m  [1;91mworkItems   WorkItem[]
+[0m
+[1;94m815 | [0m  transitionsFrom WorkflowTransition[] @relation("fromState")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `workItem` in model `WorkflowTransitionHistory`: The relation field `workI
+tem` on model `WorkflowTransitionHistory` is missing an opposite relation field on the model `WorkItem`. Either run `pr
+isma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:847[0m
+[1;94m   | [0m
+[1;94m846 | [0m  workItemId    String
+[1;94m847 | [0m  [1;91mworkItem      WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+[0m
+[1;94m848 | [0m  transitionId  String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `performedBy` in model `WorkflowTransitionHistory`: The relation field `pe
+rformedBy` on model `WorkflowTransitionHistory` is missing an opposite relation field on the model `User`. Either run `
+prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:855[0m
+[1;94m   | [0m
+[1;94m854 | [0m  performedById String?
+[1;94m855 | [0m  [1;91mperformedBy   User?    @relation(fields: [performedById], references: [id])
+[0m
+[1;94m856 | [0m  comment       String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `Review`: The relation field `space` on model `Review` is
+ missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:865[0m
+[1;94m   | [0m
+[1;94m864 | [0m  spaceId       String
+[1;94m865 | [0m  [1;91mspace         Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m866 | [0m  title         String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `moderator` in model `Review`: The relation field `moderator` on model `Re
+view` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:873[0m
+[1;94m   | [0m
+[1;94m872 | [0m  moderatorId   String?
+[1;94m873 | [0m  [1;91mmoderator     User?    @relation("reviewModerator", fields: [moderatorId], references: [id])
+[0m
+[1;94m874 | [0m  aspiceProcess String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `Review`: The relation field `createdBy` on model `Re
+view` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:877[0m
+[1;94m   | [0m
+[1;94m876 | [0m  createdById   String?
+[1;94m877 | [0m  [1;91mcreatedBy     User?    @relation("reviewCreated", fields: [createdById], references: [id])
+[0m
+[1;94m878 | [0m  createdAt     DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `ReviewParticipant`: The relation field `user` on model `R
+eviewParticipant` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manua
+lly.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:889[0m
+[1;94m   | [0m
+[1;94m888 | [0m  userId     String
+[1;94m889 | [0m  [1;91muser       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m890 | [0m  role       String   @default("reviewer")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `defect` in model `ReviewFinding`: The relation field `defect` on model `R
+eviewFinding` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it manua
+lly.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:908[0m
+[1;94m   | [0m
+[1;94m907 | [0m  defectId    String?
+[1;94m908 | [0m  [1;91mdefect      WorkItem? @relation("defectFinding", fields: [defectId], references: [id])
+[0m
+[1;94m909 | [0m  createdById String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `ReviewFinding`: The relation field `createdBy` on mo
+del `ReviewFinding` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it man
+ually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:910[0m
+[1;94m   | [0m
+[1;94m909 | [0m  createdById String?
+[1;94m910 | [0m  [1;91mcreatedBy   User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m911 | [0m  createdAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `approver` in model `Approval`: The relation field `approver` on model `Ap
+proval` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:921[0m
+[1;94m   | [0m
+[1;94m920 | [0m  approverId      String
+[1;94m921 | [0m  [1;91mapprover        User     @relation(fields: [approverId], references: [id])
+[0m
+[1;94m922 | [0m  decision        String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `signer` in model `ElectronicSignature`: The relation field `signer` on mo
+del `ElectronicSignature` is missing an opposite relation field on the model `User`. Either run `prisma format` or add 
+it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:937[0m
+[1;94m   | [0m
+[1;94m936 | [0m  signerId       String
+[1;94m937 | [0m  [1;91msigner         User     @relation(fields: [signerId], references: [id])
+[0m
+[1;94m938 | [0m  signatureType  String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `actor` in model `AuditLog`: The relation field `actor` on model `AuditLog
+` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:963[0m
+[1;94m   | [0m
+[1;94m962 | [0m  actorId        String?
+[1;94m963 | [0m  [1;91mactor          User?    @relation(fields: [actorId], references: [id])
+[0m
+[1;94m964 | [0m  actorIp        String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `workItem` in model `EvidenceLink`: The relation field `workItem` on model
+ `EvidenceLink` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it man
+ually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:988[0m
+[1;94m   | [0m
+[1;94m987 | [0m  workItemId    String?
+[1;94m988 | [0m  [1;91mworkItem      WorkItem? @relation(fields: [workItemId], references: [id])
+[0m
+[1;94m989 | [0m  description   String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `ActivityFeed`: The relation field `space` on model `Acti
+vityFeed` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0
+m
+  [1;94m-->[0m  [4mprisma\schema.prisma:998[0m
+[1;94m   | [0m
+[1;94m997 | [0m  spaceId     String
+[1;94m998 | [0m  [1;91mspace       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m999 | [0m  actorId     String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `actor` in model `ActivityFeed`: The relation field `actor` on model `Acti
+vityFeed` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1000[0m
+[1;94m   | [0m
+[1;94m999 | [0m  actorId     String?
+[1;94m1000 | [0m  [1;91mactor       User?    @relation(fields: [actorId], references: [id])
+[0m
+[1;94m1001 | [0m  action      String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `Notification`: The relation field `user` on model `Notifi
+cation` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1014[0m
+[1;94m   | [0m
+[1;94m1013 | [0m  userId     String
+[1;94m1014 | [0m  [1;91muser       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1015 | [0m  type       String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `NotificationPreference`: The relation field `user` on mod
+el `NotificationPreference` is missing an opposite relation field on the model `User`. Either run `prisma format` or ad
+d it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1029[0m
+[1;94m   | [0m
+[1;94m1028 | [0m  userId           String
+[1;94m1029 | [0m  [1;91muser             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1030 | [0m  notificationType String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `SpaceProcessArea`: The relation field `space` on model `
+SpaceProcessArea` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manu
+ally.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1060[0m
+[1;94m   | [0m
+[1;94m1059 | [0m  spaceId      String
+[1;94m1060 | [0m  [1;91mspace        Space        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1061 | [0m  processCode  String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `template` in model `AspiceDeliverable`: The relation field `template` on 
+model `AspiceDeliverable` is missing an opposite relation field on the model `PageTemplate`. Either run `prisma format`
+ or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1078[0m
+[1;94m   | [0m
+[1;94m1077 | [0m  templateId  String?
+[1;94m1078 | [0m  [1;91mtemplate    PageTemplate? @relation(fields: [templateId], references: [id])
+[0m
+[1;94m1079 | [0m  sortOrder   Int      @default(0)
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `ProjectDeliverable`: The relation field `space` on model
+ `ProjectDeliverable` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it 
+manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1087[0m
+[1;94m   | [0m
+[1;94m1086 | [0m  spaceId        String
+[1;94m1087 | [0m  [1;91mspace          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1088 | [0m  deliverableId  String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `workItem` in model `ProjectDeliverable`: The relation field `workItem` on
+ model `ProjectDeliverable` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` o
+r add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1091[0m
+[1;94m   | [0m
+[1;94m1090 | [0m  workItemId     String?
+[1;94m1091 | [0m  [1;91mworkItem       WorkItem? @relation(fields: [workItemId], references: [id])
+[0m
+[1;94m1092 | [0m  status         String   @default("not_started")
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `assignedTo` in model `ProjectDeliverable`: The relation field `assignedTo
+` on model `ProjectDeliverable` is missing an opposite relation field on the model `User`. Either run `prisma format` o
+r add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1094[0m
+[1;94m   | [0m
+[1;94m1093 | [0m  assignedToId   String?
+[1;94m1094 | [0m  [1;91massignedTo     User?    @relation(fields: [assignedToId], references: [id])
+[0m
+[1;94m1095 | [0m  dueDate        DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `workItemVersion` in model `DeliverableVersion`: The relation field `workI
+temVersion` on model `DeliverableVersion` is missing an opposite relation field on the model `WorkItemVersion`. Either 
+run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1108[0m
+[1;94m   | [0m
+[1;94m1107 | [0m  workItemVersionId     String?
+[1;94m1108 | [0m  [1;91mworkItemVersion       WorkItemVersion? @relation(fields: [workItemVersionId], references: [i
+d])
+[0m
+[1;94m1109 | [0m  baselineId            String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `ProcessAssessment`: The relation field `space` on model 
+`ProcessAssessment` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it ma
+nually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1120[0m
+[1;94m   | [0m
+[1;94m1119 | [0m  spaceId        String
+[1;94m1120 | [0m  [1;91mspace          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1121 | [0m  processCode    String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `assessor` in model `ProcessAssessment`: The relation field `assessor` on 
+model `ProcessAssessment` is missing an opposite relation field on the model `User`. Either run `prisma format` or add 
+it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1126[0m
+[1;94m   | [0m
+[1;94m1125 | [0m  assessorId     String?
+[1;94m1126 | [0m  [1;91massessor       User?    @relation(fields: [assessorId], references: [id])
+[0m
+[1;94m1127 | [0m  evidenceItems  String[]
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `ComplianceChecklist`: The relation field `space` on mode
+l `ComplianceChecklist` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add i
+t manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1136[0m
+[1;94m   | [0m
+[1;94m1135 | [0m  spaceId     String
+[1;94m1136 | [0m  [1;91mspace       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1137 | [0m  processCode String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `assignedTo` in model `ComplianceChecklist`: The relation field `assignedT
+o` on model `ComplianceChecklist` is missing an opposite relation field on the model `User`. Either run `prisma format`
+ or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1146[0m
+[1;94m   | [0m
+[1;94m1145 | [0m  assignedToId String?
+[1;94m1146 | [0m  [1;91massignedTo  User?    @relation(fields: [assignedToId], references: [id])
+[0m
+[1;94m1147 | [0m  dueDate     DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `Board`: The relation field `space` on model `Board` is m
+issing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1162[0m
+[1;94m   | [0m
+[1;94m1161 | [0m  spaceId      String
+[1;94m1162 | [0m  [1;91mspace        Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1163 | [0m  name         String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `Board`: The relation field `createdBy` on model `Boa
+rd` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1169[0m
+[1;94m   | [0m
+[1;94m1168 | [0m  createdById  String?
+[1;94m1169 | [0m  [1;91mcreatedBy    User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m1170 | [0m  createdAt    DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `workItem` in model `SprintItem`: The relation field `workItem` on model `
+SprintItem` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it manuall
+y.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1194[0m
+[1;94m   | [0m
+[1;94m1193 | [0m  workItemId  String
+[1;94m1194 | [0m  [1;91mworkItem    WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1195 | [0m  addedAt     DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `addedBy` in model `SprintItem`: The relation field `addedBy` on model `Sp
+rintItem` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1197[0m
+[1;94m   | [0m
+[1;94m1196 | [0m  addedById   String?
+[1;94m1197 | [0m  [1;91maddedBy     User?    @relation("addedBy", fields: [addedById], references: [id])
+[0m
+[1;94m1198 | [0m  @@id([sprintId, workItemId])
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `workItem` in model `BacklogRanking`: The relation field `workItem` on mod
+el `BacklogRanking` is missing an opposite relation field on the model `WorkItem`. Either run `prisma format` or add it
+ manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1204[0m
+[1;94m   | [0m
+[1;94m1203 | [0m  workItemId String   @id
+[1;94m1204 | [0m  [1;91mworkItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1205 | [0m  spaceId    String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `BacklogRanking`: The relation field `space` on model `Ba
+cklogRanking` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually
+.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1206[0m
+[1;94m   | [0m
+[1;94m1205 | [0m  spaceId    String
+[1;94m1206 | [0m  [1;91mspace      Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1207 | [0m  rank       String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `org` in model `ExternalOrganization`: The relation field `org` on model `
+ExternalOrganization` is missing an opposite relation field on the model `Organization`. Either run `prisma format` or 
+add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1235[0m
+[1;94m   | [0m
+[1;94m1234 | [0m  orgId         String
+[1;94m1235 | [0m  [1;91morg           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1236 | [0m  name          String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `UserStakeholderProfile`: The relation field `user` on mod
+el `UserStakeholderProfile` is missing an opposite relation field on the model `User`. Either run `prisma format` or ad
+d it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1256[0m
+[1;94m   | [0m
+[1;94m1255 | [0m  userId            String   @id
+[1;94m1256 | [0m  [1;91muser              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1257 | [0m  stakeholderTypeId String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `org` in model `StakeholderAccessPolicy`: The relation field `org` on mode
+l `StakeholderAccessPolicy` is missing an opposite relation field on the model `Organization`. Either run `prisma forma
+t` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1275[0m
+[1;94m   | [0m
+[1;94m1274 | [0m  orgId                    String?
+[1;94m1275 | [0m  [1;91morg                      Organization? @relation(fields: [orgId], references: [id])
+[0m
+[1;94m1276 | [0m  scope                    String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `SpaceStakeholderAccess`: The relation field `space` on m
+odel `SpaceStakeholderAccess` is missing an opposite relation field on the model `Space`. Either run `prisma format` or
+ add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1291[0m
+[1;94m   | [0m
+[1;94m1290 | [0m  spaceId              String
+[1;94m1291 | [0m  [1;91mspace                Space    @relation(fields: [spaceId], references: [id], onDelete: Casca
+de)
+[0m
+[1;94m1292 | [0m  stakeholderTypeId    String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `grantedBy` in model `SpaceStakeholderAccess`: The relation field `granted
+By` on model `SpaceStakeholderAccess` is missing an opposite relation field on the model `User`. Either run `prisma for
+mat` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1304[0m
+[1;94m   | [0m
+[1;94m1303 | [0m  grantedById          String?
+[1;94m1304 | [0m  [1;91mgrantedBy            User?    @relation(fields: [grantedById], references: [id])
+[0m
+[1;94m1305 | [0m  grantedAt            DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `org` in model `Invitation`: The relation field `org` on model `Invitation
+` is missing an opposite relation field on the model `Organization`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1314[0m
+[1;94m   | [0m
+[1;94m1313 | [0m  orgId             String
+[1;94m1314 | [0m  [1;91morg               Organization @relation(fields: [orgId], references: [id], onDelete: Cascad
+e)
+[0m
+[1;94m1315 | [0m  email             String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `externalOrg` in model `Invitation`: The relation field `externalOrg` on m
+odel `Invitation` is missing an opposite relation field on the model `ExternalOrganization`. Either run `prisma format`
+ or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1319[0m
+[1;94m   | [0m
+[1;94m1318 | [0m  externalOrgId     String?
+[1;94m1319 | [0m  [1;91mexternalOrg       ExternalOrganization? @relation(fields: [externalOrgId], references: [id])
+[0m
+[1;94m1320 | [0m  allowedSpaces     String[]
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `invitedBy` in model `Invitation`: The relation field `invitedBy` on model
+ `Invitation` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.
+[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1327[0m
+[1;94m   | [0m
+[1;94m1326 | [0m  invitedById       String?
+[1;94m1327 | [0m  [1;91minvitedBy         User?    @relation("invitedBy", fields: [invitedById], references: [id])
+[0m
+[1;94m1328 | [0m  acceptedById      String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `acceptedBy` in model `Invitation`: The relation field `acceptedBy` on mod
+el `Invitation` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manuall
+y.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1329[0m
+[1;94m   | [0m
+[1;94m1328 | [0m  acceptedById      String?
+[1;94m1329 | [0m  [1;91macceptedBy        User?    @relation("acceptedBy", fields: [acceptedById], references: [id])
+[0m
+[1;94m1330 | [0m  acceptedAt        DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `org` in model `RegistrationRequest`: The relation field `org` on model `R
+egistrationRequest` is missing an opposite relation field on the model `Organization`. Either run `prisma format` or ad
+d it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1341[0m
+[1;94m   | [0m
+[1;94m1340 | [0m  orgId                 String
+[1;94m1341 | [0m  [1;91morg                   Organization @relation(fields: [orgId], references: [id])
+[0m
+[1;94m1342 | [0m  email                 String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `reviewedBy` in model `RegistrationRequest`: The relation field `reviewedB
+y` on model `RegistrationRequest` is missing an opposite relation field on the model `User`. Either run `prisma format`
+ or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1351[0m
+[1;94m   | [0m
+[1;94m1350 | [0m  reviewedById          String?
+[1;94m1351 | [0m  [1;91mreviewedBy            User?    @relation("reviewedBy", fields: [reviewedById], references: [
+id])
+[0m
+[1;94m1352 | [0m  reviewedAt            DateTime?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `targetUser` in model `ApprovalAuditLog`: The relation field `targetUser` 
+on model `ApprovalAuditLog` is missing an opposite relation field on the model `User`. Either run `prisma format` or ad
+d it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1365[0m
+[1;94m   | [0m
+[1;94m1364 | [0m  targetUserId  String
+[1;94m1365 | [0m  [1;91mtargetUser    User     @relation("targetUser", fields: [targetUserId], references: [id])
+[0m
+[1;94m1366 | [0m  performedById String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `performedBy` in model `ApprovalAuditLog`: The relation field `performedBy
+` on model `ApprovalAuditLog` is missing an opposite relation field on the model `User`. Either run `prisma format` or 
+add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1367[0m
+[1;94m   | [0m
+[1;94m1366 | [0m  performedById String
+[1;94m1367 | [0m  [1;91mperformedBy   User     @relation("performer", fields: [performedById], references: [id])
+[0m
+[1;94m1368 | [0m  oldStatus     String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `role` in model `ApprovalAuditLog`: The relation field `role` on model `Ap
+provalAuditLog` is missing an opposite relation field on the model `Role`. Either run `prisma format` or add it manuall
+y.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1371[0m
+[1;94m   | [0m
+[1;94m1370 | [0m  roleId        String?
+[1;94m1371 | [0m  [1;91mrole          Role?    @relation(fields: [roleId], references: [id])
+[0m
+[1;94m1372 | [0m  comment       String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `ApiKey`: The relation field `user` on model `ApiKey` is m
+issing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1385[0m
+[1;94m   | [0m
+[1;94m1384 | [0m  userId     String
+[1;94m1385 | [0m  [1;91muser       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1386 | [0m  orgId      String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `org` in model `ApiKey`: The relation field `org` on model `ApiKey` is mis
+sing an opposite relation field on the model `Organization`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1387[0m
+[1;94m   | [0m
+[1;94m1386 | [0m  orgId      String
+[1;94m1387 | [0m  [1;91morg        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1388 | [0m  name       String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `McpSession`: The relation field `user` on model `McpSessi
+on` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1404[0m
+[1;94m   | [0m
+[1;94m1403 | [0m  userId           String
+[1;94m1404 | [0m  [1;91muser             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1405 | [0m  sessionToken     String   @unique
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `org` in model `Webhook`: The relation field `org` on model `Webhook` is m
+issing an opposite relation field on the model `Organization`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1418[0m
+[1;94m   | [0m
+[1;94m1417 | [0m  orgId       String
+[1;94m1418 | [0m  [1;91morg         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1419 | [0m  spaceId     String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `Webhook`: The relation field `space` on model `Webhook` 
+is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1420[0m
+[1;94m   | [0m
+[1;94m1419 | [0m  spaceId     String?
+[1;94m1420 | [0m  [1;91mspace       Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1421 | [0m  name        String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `Webhook`: The relation field `createdBy` on model `W
+ebhook` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1427[0m
+[1;94m   | [0m
+[1;94m1426 | [0m  createdById String?
+[1;94m1427 | [0m  [1;91mcreatedBy   User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m1428 | [0m  createdAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `org` in model `NdaDocument`: The relation field `org` on model `NdaDocume
+nt` is missing an opposite relation field on the model `Organization`. Either run `prisma format` or add it manually.[
+0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1456[0m
+[1;94m   | [0m
+[1;94m1455 | [0m  orgId         String
+[1;94m1456 | [0m  [1;91morg           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1457 | [0m  title         String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `NdaSignature`: The relation field `user` on model `NdaSig
+nature` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1473[0m
+[1;94m   | [0m
+[1;94m1472 | [0m  userId         String
+[1;94m1473 | [0m  [1;91muser           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1474 | [0m  externalOrgId  String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `user` in model `UrlAccessLog`: The relation field `user` on model `UrlAcc
+essLog` is missing an opposite relation field on the model `User`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1506[0m
+[1;94m   | [0m
+[1;94m1505 | [0m  userId      String?
+[1;94m1506 | [0m  [1;91muser        User?    @relation(fields: [userId], references: [id])
+[0m
+[1;94m1507 | [0m  url         String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `SpaceDailyMetric`: The relation field `space` on model `
+SpaceDailyMetric` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manu
+ally.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1520[0m
+[1;94m   | [0m
+[1;94m1519 | [0m  spaceId              String
+[1;94m1520 | [0m  [1;91mspace                Space   @relation(fields: [spaceId], references: [id], onDelete: Cascad
+e)
+[0m
+[1;94m1521 | [0m  metricDate           DateTime @db.Date
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `SpaceTemplateApplied`: The relation field `space` on mod
+el `SpaceTemplateApplied` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add
+ it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1554[0m
+[1;94m   | [0m
+[1;94m1553 | [0m  spaceId     String
+[1;94m1554 | [0m  [1;91mspace       Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade
+)
+[0m
+[1;94m1555 | [0m  templateId  String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `appliedBy` in model `SpaceTemplateApplied`: The relation field `appliedBy
+` on model `SpaceTemplateApplied` is missing an opposite relation field on the model `User`. Either run `prisma format`
+ or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1559[0m
+[1;94m   | [0m
+[1;94m1558 | [0m  appliedById String?
+[1;94m1559 | [0m  [1;91mappliedBy   User?           @relation(fields: [appliedById], references: [id])
+[0m
+[1;94m1560 | [0m  @@id([spaceId, templateId])
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `org` in model `SharedComponent`: The relation field `org` on model `Share
+dComponent` is missing an opposite relation field on the model `Organization`. Either run `prisma format` or add it man
+ually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1567[0m
+[1;94m   | [0m
+[1;94m1566 | [0m  orgId         String
+[1;94m1567 | [0m  [1;91morg           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1568 | [0m  name          String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `ownerSpace` in model `SharedComponent`: The relation field `ownerSpace` o
+n model `SharedComponent` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add
+ it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1573[0m
+[1;94m   | [0m
+[1;94m1572 | [0m  ownerSpaceId  String?
+[1;94m1573 | [0m  [1;91mownerSpace    Space?   @relation(fields: [ownerSpaceId], references: [id])
+[0m
+[1;94m1574 | [0m  createdAt     DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `ComponentUsage`: The relation field `space` on model `Co
+mponentUsage` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it manually
+.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1583[0m
+[1;94m   | [0m
+[1;94m1582 | [0m  spaceId     String
+[1;94m1583 | [0m  [1;91mspace       Space          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1584 | [0m  usedVersion String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `role` in model `RoleResponsibility`: The relation field `role` on model `
+RoleResponsibility` is missing an opposite relation field on the model `Role`. Either run `prisma format` or add it man
+ually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1593[0m
+[1;94m   | [0m
+[1;94m1592 | [0m  roleId         String
+[1;94m1593 | [0m  [1;91mrole           Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1594 | [0m  spaceId        String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `space` in model `RoleResponsibility`: The relation field `space` on model
+ `RoleResponsibility` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it 
+manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1595[0m
+[1;94m   | [0m
+[1;94m1594 | [0m  spaceId        String
+[1;94m1595 | [0m  [1;91mspace          Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+[0m
+[1;94m1596 | [0m  aspiceProcess  String?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `fromSpace` in model `CrossProjectLink`: The relation field `fromSpace` on
+ model `CrossProjectLink` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add
+ it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1607[0m
+[1;94m   | [0m
+[1;94m1606 | [0m  fromSpaceId String
+[1;94m1607 | [0m  [1;91mfromSpace   Space    @relation("fromSpace", fields: [fromSpaceId], references: [id], onDelet
+e: Cascade)
+[0m
+[1;94m1608 | [0m  fromType    String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `toSpace` in model `CrossProjectLink`: The relation field `toSpace` on mod
+el `CrossProjectLink` is missing an opposite relation field on the model `Space`. Either run `prisma format` or add it 
+manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1611[0m
+[1;94m   | [0m
+[1;94m1610 | [0m  toSpaceId   String
+[1;94m1611 | [0m  [1;91mtoSpace     Space    @relation("toSpace", fields: [toSpaceId], references: [id], onDelete: C
+ascade)
+[0m
+[1;94m1612 | [0m  toType      String
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `createdBy` in model `CrossProjectLink`: The relation field `createdBy` on
+ model `CrossProjectLink` is missing an opposite relation field on the model `User`. Either run `prisma format` or add 
+it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1616[0m
+[1;94m   | [0m
+[1;94m1615 | [0m  createdById String?
+[1;94m1616 | [0m  [1;91mcreatedBy   User?    @relation(fields: [createdById], references: [id])
+[0m
+[1;94m1617 | [0m  createdAt   DateTime @default(now())
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `requirement` in model `RequirementChangeHistory`: The relation field `req
+uirement` on model `RequirementChangeHistory` is missing an opposite relation field on the model `WorkItem`. Either run
+ `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1624[0m
+[1;94m   | [0m
+[1;94m1623 | [0m  requirementId  String
+[1;94m1624 | [0m  [1;91mrequirement    WorkItem @relation(fields: [requirementId], references: [id], onDelete: Casca
+de)
+[0m
+[1;94m1625 | [0m  versionFrom    Int
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `changedBy` in model `RequirementChangeHistory`: The relation field `chang
+edBy` on model `RequirementChangeHistory` is missing an opposite relation field on the model `User`. Either run `prisma
+ format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:1629[0m
+[1;94m   | [0m
+[1;94m1628 | [0m  changedById    String?
+[1;94m1629 | [0m  [1;91mchangedBy      User?    @relation(fields: [changedById], references: [id])
+[0m
+[1;94m1630 | [0m  changedAt      DateTime @default(now())
+[1;94m   | [0m
+
+Validation Error Count: 127
+[Context: getDmmf]
+
+Prisma CLI Version : 5.22.0

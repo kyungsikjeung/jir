@@ -1,0 +1,122 @@
+﻿Prisma schema loaded from prisma\schema.prisma
+node.exe : Error: Prisma schema validation - (get-dmmf wasm)
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:\nvm4w\nodejs/node_modules/npm/bin/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error: Prisma s...(get-dmmf wasm):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Error code: P1012
+[1;91merror[0m: [1mError validating field `settings` in model `Space`: The relation field `settings` on model `Space
+` is missing an opposite relation field on the model `SpaceSettings`. Either run `prisma format` or add it manually.[0
+m
+  [1;94m-->[0m  [4mprisma\schema.prisma:123[0m
+[1;94m   | [0m
+[1;94m122 | [0m  updatedAt        DateTime @updatedAt
+[1;94m123 | [0m  [1;91msettings         SpaceSettings?
+[0m
+[1;94m124 | [0m  @@index([orgId])
+[1;94m   | [0m
+[1;91merror[0m: [1mError parsing attribute "@relation": The given constraint name `work_items__fkey` has to be uniqu
+e in the following namespace: on model `WorkItem` for primary key, indexes, unique constraints and foreign keys. Please
+ provide a different name using the `map` argument.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:232[0m
+[1;94m   | [0m
+[1;94m231 | [0m  resolvedAt      DateTime?
+[1;94m232 | [0m  [1;91mpage            Page?
+[0m
+[1;94m233 | [0m  requirement     Requirement?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `page` in model `WorkItem`: The relation field `page` on model `WorkItem` 
+is missing an opposite relation field on the model `Page`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:232[0m
+[1;94m   | [0m
+[1;94m231 | [0m  resolvedAt      DateTime?
+[1;94m232 | [0m  [1;91mpage            Page?
+[0m
+[1;94m233 | [0m  requirement     Requirement?
+[1;94m   | [0m
+[1;91merror[0m: [1mError parsing attribute "@relation": The given constraint name `work_items__fkey` has to be uniqu
+e in the following namespace: on model `WorkItem` for primary key, indexes, unique constraints and foreign keys. Please
+ provide a different name using the `map` argument.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:233[0m
+[1;94m   | [0m
+[1;94m232 | [0m  page            Page?
+[1;94m233 | [0m  [1;91mrequirement     Requirement?
+[0m
+[1;94m234 | [0m  testCase        TestCase?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `requirement` in model `WorkItem`: The relation field `requirement` on mod
+el `WorkItem` is missing an opposite relation field on the model `Requirement`. Either run `prisma format` or add it ma
+nually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:233[0m
+[1;94m   | [0m
+[1;94m232 | [0m  page            Page?
+[1;94m233 | [0m  [1;91mrequirement     Requirement?
+[0m
+[1;94m234 | [0m  testCase        TestCase?
+[1;94m   | [0m
+[1;91merror[0m: [1mError parsing attribute "@relation": The given constraint name `work_items__fkey` has to be uniqu
+e in the following namespace: on model `WorkItem` for primary key, indexes, unique constraints and foreign keys. Please
+ provide a different name using the `map` argument.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:234[0m
+[1;94m   | [0m
+[1;94m233 | [0m  requirement     Requirement?
+[1;94m234 | [0m  [1;91mtestCase        TestCase?
+[0m
+[1;94m235 | [0m  defect          Defect?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `testCase` in model `WorkItem`: The relation field `testCase` on model `Wo
+rkItem` is missing an opposite relation field on the model `TestCase`. Either run `prisma format` or add it manually.[
+0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:234[0m
+[1;94m   | [0m
+[1;94m233 | [0m  requirement     Requirement?
+[1;94m234 | [0m  [1;91mtestCase        TestCase?
+[0m
+[1;94m235 | [0m  defect          Defect?
+[1;94m   | [0m
+[1;91merror[0m: [1mError parsing attribute "@relation": The given constraint name `work_items__fkey` has to be uniqu
+e in the following namespace: on model `WorkItem` for primary key, indexes, unique constraints and foreign keys. Please
+ provide a different name using the `map` argument.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:235[0m
+[1;94m   | [0m
+[1;94m234 | [0m  testCase        TestCase?
+[1;94m235 | [0m  [1;91mdefect          Defect?
+[0m
+[1;94m236 | [0m  changeRequest   ChangeRequest?
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `defect` in model `WorkItem`: The relation field `defect` on model `WorkIt
+em` is missing an opposite relation field on the model `Defect`. Either run `prisma format` or add it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:235[0m
+[1;94m   | [0m
+[1;94m234 | [0m  testCase        TestCase?
+[1;94m235 | [0m  [1;91mdefect          Defect?
+[0m
+[1;94m236 | [0m  changeRequest   ChangeRequest?
+[1;94m   | [0m
+[1;91merror[0m: [1mError parsing attribute "@relation": The given constraint name `work_items__fkey` has to be uniqu
+e in the following namespace: on model `WorkItem` for primary key, indexes, unique constraints and foreign keys. Please
+ provide a different name using the `map` argument.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:236[0m
+[1;94m   | [0m
+[1;94m235 | [0m  defect          Defect?
+[1;94m236 | [0m  [1;91mchangeRequest   ChangeRequest?
+[0m
+[1;94m237 | [0m  @@unique([spaceId, key])
+[1;94m   | [0m
+[1;91merror[0m: [1mError validating field `changeRequest` in model `WorkItem`: The relation field `changeRequest` on
+ model `WorkItem` is missing an opposite relation field on the model `ChangeRequest`. Either run `prisma format` or add
+ it manually.[0m
+  [1;94m-->[0m  [4mprisma\schema.prisma:236[0m
+[1;94m   | [0m
+[1;94m235 | [0m  defect          Defect?
+[1;94m236 | [0m  [1;91mchangeRequest   ChangeRequest?
+[0m
+[1;94m237 | [0m  @@unique([spaceId, key])
+[1;94m   | [0m
+
+Validation Error Count: 11
+[Context: getDmmf]
+
+Prisma CLI Version : 5.22.0
