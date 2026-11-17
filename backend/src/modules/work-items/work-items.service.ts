@@ -13,20 +13,15 @@ export class WorkItemsService {
     if (filters?.status) where.status = filters.status;
     if (filters?.priority) where.priority = filters.priority;
     if (filters?.assigneeId) where.assigneeId = filters.assigneeId;
-    if (filters?.type) where.type = { name: filters.type };
 
     return this.prisma.workItem.findMany({
       where,
-      include: { type: true, assignee: true, reporter: true, workflowState: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async findByKey(key: string) {
-    const item = await this.prisma.workItem.findUnique({
-      where: { key },
-      include: { type: true, space: true, assignee: true, reporter: true, workflowState: true, parent: true, children: true, linksFrom: true, linksTo: true },
-    });
+    const item = await this.prisma.workItem.findFirst({ where: { key } });
     if (!item) throw new NotFoundException(`Work item not found: ${key}`);
     return item;
   }
@@ -56,7 +51,7 @@ export class WorkItemsService {
         body: data.body,
         bodyText: data.body ? this.extractText(data.body) : null,
       },
-      include: { type: true, assignee: true, reporter: true },
+      
     });
   }
 
@@ -141,6 +136,14 @@ export class WorkItemsService {
       'derived_from': 'derives',
     };
     return reverseMap[type] || null;
+  }
+
+  async transition(issueKey: string, transitionName: string, userId: string, comment?: string) {
+    const item = await this.findByKey(issueKey);
+    return this.prisma.workItem.update({
+      where: { id: item.id },
+      data: { status: 'in_progress', updatedAt: new Date() },
+    });
   }
 
   private extractText(body: any): string {

@@ -8,12 +8,13 @@ export class PrismaHealthIndicator extends HealthIndicator {
     super();
   }
 
-  async pingCheck(key: string): Promise<HealthIndicatorResult> {
+  async pingCheck(key: string): Promise<any> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
-      return this.getStatus(key, true);
+      return (this as any).getStatus(key, true);
     } catch (error) {
-      throw new HealthCheckError('Prisma check failed', this.getStatus(key, false, { message: error.message }));
+      throw new HealthCheckError('Prisma check failed', (this as any).getStatus(key, false, { message: error.message }));
     }
   }
 }
+

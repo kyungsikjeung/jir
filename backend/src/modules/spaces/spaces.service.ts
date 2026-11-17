@@ -8,16 +8,12 @@ export class SpacesService {
   async findAll(orgId?: string) {
     return this.prisma.space.findMany({
       where: orgId ? { orgId } : undefined,
-      include: { _count: { select: { workItems: true, members: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async findByKey(key: string) {
-    const space = await this.prisma.space.findUnique({
-      where: { key },
-      include: { members: { include: { user: true, role: true } }, settingsRel: true },
-    });
+    const space = await this.prisma.space.findUnique({ where: { key } });
     if (!space) throw new NotFoundException(`Space not found: ${key}`);
     return space;
   }
@@ -69,9 +65,6 @@ export class SpacesService {
 
   async getMembers(spaceKey: string) {
     const space = await this.findByKey(spaceKey);
-    return this.prisma.spaceMember.findMany({
-      where: { spaceId: space.id },
-      include: { user: true, role: true },
-    });
+    return this.prisma.spaceMember.findMany({ where: { spaceId: space.id } });
   }
 }
