@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Post, Param, Body } from '@nestjs/common';
+import { Controller, Get, Put, Post, Param, Body, Req } from '@nestjs/common';
 import { ComplianceService } from './compliance.service';
 
 @Controller('spaces/:key/compliance')
@@ -8,6 +8,22 @@ export class ComplianceController {
   @Get()
   async getSummary(@Param('key') key: string) {
     return this.complianceService.getSummary(key);
+  }
+
+  // ── 베이스라인 (형상관리) ──────────────────────────────────
+  @Get('baselines')
+  async getBaselines(@Param('key') key: string) {
+    return this.complianceService.getBaselines(key);
+  }
+
+  @Post('baselines')
+  async createBaseline(@Param('key') key: string, @Body() body: any, @Req() req: any) {
+    return this.complianceService.createBaseline(key, body, req.user?.id || body.createdById || 'system');
+  }
+
+  @Post('baselines/:id/release')
+  async releaseBaseline(@Param('id') id: string, @Req() req: any) {
+    return this.complianceService.releaseBaseline(id, req.user?.id || 'system');
   }
 
   @Get(':processCode')
@@ -21,7 +37,7 @@ export class ComplianceController {
   }
 
   @Post('assessments')
-  async createAssessment(@Param('key') key: string, @Body() body: any) {
-    return this.complianceService.createAssessment(key, body, body.assessorId || 'system');
+  async createAssessment(@Param('key') key: string, @Body() body: any, @Req() req: any) {
+    return this.complianceService.createAssessment(key, body, req.user?.id || body.assessorId || 'system');
   }
 }

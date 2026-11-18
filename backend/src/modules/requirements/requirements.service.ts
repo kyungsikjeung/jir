@@ -8,8 +8,10 @@ export class RequirementsService {
   async findAll(spaceKey: string, filters?: { reqType?: string; asilLevel?: string; status?: string }) {
     const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
     if (!space) throw new NotFoundException(`Space not found: ${spaceKey}`);
-    const where: any = { spaceId: space.id, type: { name: 'requirement' } };
+    const type = await this.prisma.workItemType.findFirst({ where: { spaceId: space.id, name: 'requirement' } });
+    const where: any = type ? { spaceId: space.id, typeId: type.id } : { spaceId: space.id };
     if (filters?.status) where.status = filters.status;
+    if (filters?.asilLevel) where.asilLevel = filters.asilLevel;
     return this.prisma.workItem.findMany({
       where,
       orderBy: { createdAt: 'desc' },

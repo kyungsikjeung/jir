@@ -5,48 +5,143 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class TraceabilityService {
   constructor(private prisma: PrismaService) {}
 
-  async createLink(data: { fromType: string; fromId: string; toType: string; toId: string; linkType: string }, userId: string) {
+  private async space(key: string) {
+    const space = await this.prisma.space.findUnique({ where: { key } });
+    if (!space) throw new NotFoundException(`Space not found: ${key}`);
+    return space;
+  }
+
+  private async typeId(spaceId: string, name: string) {
+    const t = await this.prisma.workItemType.findFirst({ where: { spaceId, name } });
+    return t?.id;
+  }
+
+  async createLink(
+    data: { fromType: string; fromId: string; toType: string; toId: string; linkType: string },
+    userId: string,
+  ) {
     const link = await this.prisma.traceLink.create({
-      data: { fromType: data.fromType, fromId: data.fromId, toType: data.toType, toId: data.toId, linkType: data.linkType, createdById: userId },
+      data: {
+        fromType: data.fromType,
+        fromId: data.fromId,
+        toType: data.toType,
+        toId: data.toId,
+        linkType: data.linkType,
+        createdById: userId,
+      },
     });
+
     // 양방향 링크 자동 생성
-    const reverseMap: Record<string, string> = { verifies: 'verified_by', satisfies: 'satisfied_by', implements: 'implemented_by', derives: 'derived_from' };
+    const reverseMap: Record<string, string> = {
+      verifies: 'verified_by',
+      satisfies: 'satisfied_by',
+      implements: 'implemented_by',
+      derives: 'derived_from',
+      verified_by: 'verifies',
+      satisfied_by: 'satisfies',
+      implemented_by: 'implements',
+      derived_from: 'derives',
+    };
     const reverseType = reverseMap[data.linkType];
     if (reverseType) {
-      await this.prisma.traceLink.create({
-        data: { fromType: data.toType, fromId: data.toId, toType: data.fromType, toId: data.fromId, linkType: reverseType, createdById: userId },
-      }).catch(() => {});
+      await this.prisma.traceLink
+        .create({
+          data: {
+            fromType: data.toType,
+            fromId: data.toId,
+            toType: data.fromType,
+            toId: data.fromId,
+            linkType: reverseType,
+            createdById: userId,
+          },
+        })
+        .catch(() => undefined);
     }
     return link;
   }
 
+  async deleteLink(linkId: string) {
+    const link = await this.prisma.traceLink.findUnique({ where: { id: linkId } });
+    if (!link) throw new NotFoundException(`Trace link not found: ${linkId}`);
+    const reverseMap: Record<string, string> = {
+      verifies: 'verified_by', verified_by: 'verifies',
+      satisfies: 'satisfied_by', satisfied_by: 'satisfies',
+      implements: 'implemented_by', implemented_by: 'implements',
+      derives: 'derived_from', derived_from: 'derives',
+    };
+    const reverse = reverseMap[link.linkType];
+    if (reverse) {
+      await this.prisma.traceLink.deleteMany({
+        where: { fromType: link.toType, fromId: link.toId, toType: link.fromType, toId: link.fromId, linkType: reverse },
+      });
+    }
+    await this.prisma.traceLink.delete({ where: { id: linkId } });
+    return { success: true };
+  }
+
   async getMatrix(spaceKey: string) {
-    const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
-    if (!space) throw new NotFoundException(`Space not found: ${spaceKey}`);
+    const space = await this.space(spaceKey);
+    const [reqTypeId, testTypeId] = await Promise.all([
+      this.typeId(space.id, 'requirement'),
+      this.typeId(space.id, 'test_case'),
+    ]);
+    const [requirements, tests, allItems] = await Promise.all([
+      reqTypeId ? this.prisma.workItem.findMany({ where: { spaceId: space.id, typeId: reqTypeId }, orderBy: { key: 'asc' } }) : [],
+      testTypeId ? this.prisma.workItem.findMany({ where: { spaceId: space.id, typeId: testTypeId }, orderBy: { key: 'asc' } }) : [],
+      this.prisma.workItem.findMany({ where: { spaceId: space.id }, select: { id: true } }),
+    ]);
+    const ids = new Set(allItems.map((i) => i.id));
     const links = await this.prisma.traceLink.findMany();
-    const requirements = await this.prisma.workItem.findMany({ where: { spaceId: space.id, typeId: 'requirement-type-id' } });
-    const tests = await this.prisma.workItem.findMany({ where: { spaceId: space.id, typeId: 'test-case-type-id' } });
-    return { requirements, tests, links };
+    const scoped = links.filter((l) => ids.has(l.fromId) || ids.has(l.toId));
+    return { requirements, tests, links: scoped };
   }
 
   async getCoverage(spaceKey: string) {
-    const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
-    if (!space) throw new NotFoundException(`Space not found: ${spaceKey}`);
-    const requirements = await this.prisma.workItem.findMany({ where: { spaceId: space.id, typeId: 'requirement-type-id' } });
-    const links = await this.prisma.traceLink.findMany({ where: { fromType: 'requirement', toType: 'test_case' } });
-    const covered = requirements.filter(r => links.some(l => l.fromId === r.id));
-    return { total: requirements.length, covered: covered.length, percent: requirements.length > 0 ? (covered.length / requirements.length) * 100 : 0, uncovered: requirements.filter(r => !covered.includes(r)).map(r => r.key) };
+    const space = await this.space(spaceKey);
+    const reqTypeId = await this.typeId(space.id, 'requirement');
+    if (!reqTypeId) return { total: 0, covered: 0, percent: 0, uncovered: [] };
+
+    const requirements = await this.prisma.workItem.findMany({
+      where: { spaceId: space.id, typeId: reqTypeId },
+      orderBy: { key: 'asc' },
+    });
+    const reqIds = requirements.map((r) => r.id);
+    const links = await this.prisma.traceLink.findMany({
+      where: { fromType: 'requirement', toType: 'test_case', fromId: { in: reqIds } },
+    });
+    const coveredIds = new Set(links.map((l) => l.fromId));
+    const covered = requirements.filter((r) => coveredIds.has(r.id));
+    return {
+      total: requirements.length,
+      covered: covered.length,
+      percent: requirements.length > 0 ? +((covered.length / requirements.length) * 100).toFixed(2) : 0,
+      uncovered: requirements.filter((r) => !coveredIds.has(r.id)).map((r) => r.key),
+    };
   }
 
-  async markSuspect(changedItemId: string) {
+  async markSuspect(changedItemId: string, reason?: string) {
+    const links = await this.prisma.traceLink.findMany({
+      where: { OR: [{ fromId: changedItemId }, { toId: changedItemId }] },
+    });
     await this.prisma.traceLink.updateMany({
       where: { OR: [{ fromId: changedItemId }, { toId: changedItemId }] },
       data: { isSuspect: true },
     });
+    for (const l of links) {
+      await this.prisma.suspectLink.create({
+        data: { traceLinkId: l.id, reason: reason || '연결된 항목이 변경됨' },
+      });
+    }
+    return { marked: links.length };
   }
 
   async getSuspectLinks(spaceKey: string) {
-    return this.prisma.traceLink.findMany({ where: { isSuspect: true } });
+    const space = await this.space(spaceKey);
+    const items = await this.prisma.workItem.findMany({ where: { spaceId: space.id }, select: { id: true } });
+    const ids = items.map((i) => i.id);
+    return this.prisma.traceLink.findMany({
+      where: { isSuspect: true, OR: [{ fromId: { in: ids } }, { toId: { in: ids } }] },
+    });
   }
 
   async resolveSuspect(linkId: string, resolution: string, userId: string) {

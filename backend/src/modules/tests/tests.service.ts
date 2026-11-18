@@ -8,7 +8,8 @@ export class TestsService {
   async findTestCases(spaceKey: string, filters?: { testType?: string }) {
     const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
     if (!space) throw new NotFoundException(`Space not found: ${spaceKey}`);
-    const where: any = { spaceId: space.id, type: { name: 'test_case' } };
+    const type = await this.prisma.workItemType.findFirst({ where: { spaceId: space.id, name: 'test_case' } });
+    const where: any = type ? { spaceId: space.id, typeId: type.id } : { spaceId: space.id };
     return this.prisma.workItem.findMany({
       where,
       orderBy: { createdAt: 'desc' },

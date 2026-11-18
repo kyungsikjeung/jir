@@ -1,13 +1,18 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 
-// Simple password hashing (replace with bcrypt in production)
+// 비밀번호 해싱 (bcryptjs — 순수 JS, 네이티브 빌드 불필요)
 function hashPassword(password: string): string {
-  return Buffer.from(password).toString('base64');
+  return bcrypt.hashSync(password, 10);
 }
 
 function comparePassword(password: string, hash: string): boolean {
+  if (!hash) return false;
+  // bcrypt 해시 ($2a$/$2b$/$2y$)
+  if (hash.startsWith('$2')) return bcrypt.compareSync(password, hash);
+  // 레거시 개발용 base64 해시 (마이그레이션 호환)
   return Buffer.from(password).toString('base64') === hash;
 }
 
@@ -46,7 +51,7 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new UnauthorizedException('Email already registered');
 
-    const isInternal = email.endsWith('@tovis.com');
+    const isInternal = email.endsWith(`@${process.env.INTERNAL_EMAIL_DOMAIN || 'tovis.com'}`);
     const passwordHash = hashPassword(password);
 
     const user = await this.prisma.user.create({

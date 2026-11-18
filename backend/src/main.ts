@@ -5,7 +5,6 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import * as winston from 'winston';
 import { WinstonModule } from 'nest-winston';
@@ -42,7 +41,7 @@ async function bootstrap() {
   // Global pipes, filters, interceptors
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new TransformInterceptor(), new LoggingInterceptor());
+  app.useGlobalInterceptors(new LoggingInterceptor());
 
   // API prefix
   app.setGlobalPrefix('api');

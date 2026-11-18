@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
 import { StakeholdersService } from './stakeholders.service';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller()
 export class StakeholdersController {

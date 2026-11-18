@@ -5,50 +5,105 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class DocumentsService {
   constructor(private prisma: PrismaService) {}
 
-  async getTree(spaceKey: string) {
-    const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
-    if (!space) throw new NotFoundException(`Space not found: ${spaceKey}`);
-    const pages = await this.prisma.workItem.findMany({
-      where: { spaceId: space.id },
-      orderBy: { createdAt: 'asc' },
-    });
-    return this.buildTree(pages);
+  private async space(key: string) {
+    const space = await this.prisma.space.findUnique({ where: { key } });
+    if (!space) throw new NotFoundException(`Space not found: ${key}`);
+    return space;
   }
 
-  private buildTree(pages: any[]) {
-    const map = new Map();
-    const roots = [];
-    for (const page of pages) {
-      map.set(page.id, { ...page, children: [] });
+  private async pageTypeId(spaceId: string) {
+    const type = await this.prisma.workItemType.findFirst({
+      where: { spaceId, name: 'page' },
+    });
+    return type?.id;
+  }
+
+  private async nextKey(spaceId: string, spaceKey: string) {
+    const items = await this.prisma.workItem.findMany({ where: { spaceId }, select: { key: true } });
+    let max = 0;
+    for (const { key } of items) {
+      const n = Number(key.split('-').pop());
+      if (Number.isFinite(n) && n > max) max = n;
     }
-    for (const page of pages) {
-      if (page.page?.parentPageId && map.has(page.page.parentPageId)) {
-        map.get(page.page.parentPageId).children.push(map.get(page.id));
+    return `${spaceKey}-${max + 1}`;
+  }
+
+  /** 문서(페이지) 트리 — page 타입만, parentPageId 계층 포함 */
+  async getTree(spaceKey: string) {
+    const space = await this.space(spaceKey);
+    const typeId = await this.pageTypeId(space.id);
+    if (!typeId) return [];
+
+    const pages = await this.prisma.workItem.findMany({
+      where: { spaceId: space.id, typeId },
+      orderBy: [{ createdAt: 'asc' }],
+      select: {
+        id: true,
+        key: true,
+        title: true,
+        status: true,
+        version: true,
+        updatedAt: true,
+      },
+    });
+    const pageMeta = await this.prisma.page.findMany({
+      where: { workItemId: { in: pages.map((p) => p.id) } },
+    });
+    const metaById = new Map(pageMeta.map((p) => [p.workItemId, p]));
+
+    const nodes = pages.map((p) => ({
+      ...p,
+      parentPageId: metaById.get(p.id)?.parentPageId ?? null,
+      position: metaById.get(p.id)?.position ?? 0,
+      isHomepage: metaById.get(p.id)?.isHomepage ?? false,
+      children: [] as any[],
+    }));
+
+    const map = new Map(nodes.map((n) => [n.id, n]));
+    const roots: any[] = [];
+    for (const node of nodes) {
+      if (node.parentPageId && map.has(node.parentPageId)) {
+        map.get(node.parentPageId)!.children.push(node);
       } else {
-        roots.push(map.get(page.id));
+        roots.push(node);
       }
     }
+    const sortRec = (list: any[]) => {
+      list.sort((a, b) => a.position - b.position || a.key.localeCompare(b.key));
+      list.forEach((n) => sortRec(n.children));
+    };
+    sortRec(roots);
     return roots;
   }
 
   async getPage(pageId: string) {
-    const page = await this.prisma.workItem.findUnique({
-      where: { id: pageId },
-    });
+    const page = await this.prisma.workItem.findUnique({ where: { id: pageId } });
     if (!page) throw new NotFoundException(`Page not found: ${pageId}`);
-    return page;
+    const [meta, versions, comments] = await Promise.all([
+      this.prisma.page.findUnique({ where: { workItemId: pageId } }),
+      this.prisma.workItemVersion.findMany({
+        where: { workItemId: pageId },
+        orderBy: { version: 'desc' },
+      }),
+      this.prisma.comment.findMany({
+        where: { targetType: 'page', targetId: pageId },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    return { ...page, page: meta, versions, comments };
   }
 
-  async createPage(spaceKey: string, data: { title: string; body?: any; parentId?: string; templateId?: string }, userId: string) {
-    const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
-    if (!space) throw new NotFoundException(`Space not found: ${spaceKey}`);
+  async createPage(
+    spaceKey: string,
+    data: { title: string; body?: any; bodyText?: string; parentPageId?: string; templateId?: string },
+    userId: string,
+  ) {
+    const space = await this.space(spaceKey);
+    const typeId = await this.pageTypeId(space.id);
+    if (!typeId) throw new NotFoundException(`Work item type not found: page`);
 
-    const type = await this.prisma.workItemType.findFirst({ where: { spaceId: space.id, name: 'page' } });
-    const count = await this.prisma.workItem.count({ where: { spaceId: space.id } });
-    const key = `${space.key}-${count + 1}`;
-
-    let body = data.body || {};
-    if (data.templateId) {
+    let body = data.body ?? null;
+    if (!body && data.templateId) {
       const template = await this.prisma.pageTemplate.findUnique({ where: { id: data.templateId } });
       if (template) body = template.body;
     }
@@ -56,47 +111,91 @@ export class DocumentsService {
     const workItem = await this.prisma.workItem.create({
       data: {
         spaceId: space.id,
-        typeId: type.id,
-        key,
+        typeId,
+        key: await this.nextKey(space.id, space.key),
         title: data.title,
-        body,
-        bodyText: this.extractText(body),
+        status: 'open',
+        priority: 'medium',
+        body: body ?? undefined,
+        bodyText: data.bodyText ?? (body ? this.extractText(body) : null),
         reporterId: userId,
+        labels: [],
         version: 1,
       },
     });
 
     await this.prisma.page.create({
-      data: { workItemId: workItem.id, parentPageId: data.parentId, templateId: data.templateId },
+      data: {
+        workItemId: workItem.id,
+        parentPageId: data.parentPageId,
+        templateId: data.templateId,
+      },
     });
 
     await this.prisma.workItemVersion.create({
-      data: { workItemId: workItem.id, version: 1, title: data.title, body, changedById: userId },
+      data: {
+        workItemId: workItem.id,
+        version: 1,
+        title: data.title,
+        body: body ?? undefined,
+        bodyText: workItem.bodyText,
+        changedById: userId,
+      },
     });
 
-    return workItem;
+    return this.getPage(workItem.id);
   }
 
-  async updatePage(pageId: string, data: { title?: string; body?: any; changeSummary?: string }, userId: string) {
+  async updatePage(
+    pageId: string,
+    data: { title?: string; body?: any; bodyText?: string; changeSummary?: string },
+    userId: string,
+  ) {
     const page = await this.prisma.workItem.findUnique({ where: { id: pageId } });
     if (!page) throw new NotFoundException(`Page not found: ${pageId}`);
 
     const newVersion = page.version + 1;
-    const body = data.body || page.body;
+    const body = data.body !== undefined ? data.body : page.body;
+    const bodyText =
+      data.bodyText !== undefined
+        ? data.bodyText
+        : data.body !== undefined
+          ? this.extractText(data.body)
+          : page.bodyText;
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.workItem.update({
         where: { id: pageId },
-        data: { title: data.title || page.title, body, bodyText: this.extractText(body), version: newVersion },
+        data: {
+          title: data.title ?? page.title,
+          body: body ?? undefined,
+          bodyText,
+          version: newVersion,
+        },
       });
       await tx.workItemVersion.create({
-        data: { workItemId: pageId, version: newVersion, title: data.title || page.title, body, changedById: userId, changeSummary: data.changeSummary },
+        data: {
+          workItemId: pageId,
+          version: newVersion,
+          title: updated.title,
+          body: body ?? undefined,
+          bodyText,
+          changedById: userId,
+          changeSummary: data.changeSummary,
+        },
       });
       return updated;
     });
   }
 
   async deletePage(pageId: string) {
+    const page = await this.prisma.page.findUnique({ where: { workItemId: pageId } });
+    if (page) {
+      await this.prisma.page.updateMany({
+        where: { parentPageId: pageId },
+        data: { parentPageId: page.parentPageId },
+      });
+    }
     await this.prisma.workItem.delete({ where: { id: pageId } });
   }
 
@@ -111,8 +210,9 @@ export class DocumentsService {
     if (!body) return '';
     if (typeof body === 'string') return body;
     const extract = (node: any): string => {
+      if (!node) return '';
       if (node.text) return node.text;
-      if (node.content) return node.content.map(extract).join(' ');
+      if (Array.isArray(node.content)) return node.content.map(extract).join(' ');
       return '';
     };
     return extract(body);

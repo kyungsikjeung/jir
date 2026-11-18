@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -19,8 +20,10 @@ import { UploadModule } from './modules/upload/upload.module';
 import { ExportModule } from './modules/export/export.module';
 import { McpModule } from './modules/mcp/mcp.module';
 import { StakeholdersModule } from './modules/stakeholders/stakeholders.module';
+import { ResponsibilitiesModule } from './modules/responsibilities/responsibilities.module';
 import { GitModule } from './modules/git/git.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -44,8 +47,13 @@ import { AuditModule } from './modules/audit/audit.module';
     ExportModule,
     McpModule,
     StakeholdersModule,
+    ResponsibilitiesModule,
     GitModule,
     AuditModule,
+  ],
+  providers: [
+    // 전역 JWT 인증 (@Public() 제외)
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })
 export class AppModule {}

@@ -65,6 +65,26 @@ export class SpacesService {
 
   async getMembers(spaceKey: string) {
     const space = await this.findByKey(spaceKey);
-    return this.prisma.spaceMember.findMany({ where: { spaceId: space.id } });
+    const members = await this.prisma.spaceMember.findMany({
+      where: { spaceId: space.id },
+    });
+    if (!members.length) return [];
+    const [users, roles] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: members.map((m) => m.userId) } },
+        select: { id: true, displayName: true, email: true, title: true },
+      }),
+      this.prisma.role.findMany({
+        where: { id: { in: members.map((m) => m.roleId) } },
+        select: { id: true, name: true },
+      }),
+    ]);
+    const userById = new Map(users.map((u) => [u.id, u]));
+    const roleById = new Map(roles.map((r) => [r.id, r]));
+    return members.map((m) => ({
+      ...m,
+      user: userById.get(m.userId) ?? null,
+      role: roleById.get(m.roleId) ?? null,
+    }));
   }
 }

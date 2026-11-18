@@ -9,6 +9,12 @@
 | **Option C: 클라우드 (AWS/GCP/Azure)** | 관리형 서비스 | $50~200/월 | 프로덕션 |
 | **Option D: 온프레미스** | 고객사 서버 | 하드웨어 비용 | 자동차 OEM/Tier1 |
 
+> **이미지 노트 (2026-11 기준)**
+> - `minio/minio` / `quay.io/minio/minio`는 2026년 9월 이후 익명 pull이 불가능합니다(401).
+> - 본 프로젝트는 드롭인 호환 포크인 **`docker.io/pgsty/silo`**를 사용합니다
+>   (S3 API/`MINIO_*` 환경변수/`/minio/health/*` 경로 호환, 콘솔 포함).
+> - MinIO 콘솔은 호스트 **9002** 포트로 매핑됩니다(9000은 S3 API).
+
 ---
 
 ## 2. Option A: 로컬 개발 (Windows + WSL2 + Docker)
@@ -70,7 +76,7 @@ npm run dev
 | Backend API | http://localhost:3000 |
 | Swagger | http://localhost:3000/api/docs |
 | Keycloak | http://localhost:8080 |
-| MinIO Console | http://localhost:9001 |
+| MinIO Console | http://localhost:9002 |
 | Meilisearch | http://localhost:7700 |
 
 ### 장점

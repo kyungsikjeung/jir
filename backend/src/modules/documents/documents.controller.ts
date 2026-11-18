@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Req } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
 
 @Controller('spaces/:key/docs')
@@ -10,19 +10,27 @@ export class DocumentsController {
     return this.documentsService.getTree(key);
   }
 
+  @Post()
+  async createPage(@Param('key') key: string, @Body() body: any, @Req() req: any) {
+    return this.documentsService.createPage(
+      key,
+      body,
+      req.user?.id || body.reporterId || 'system',
+    );
+  }
+
   @Get(':pageId')
   async getPage(@Param('pageId') pageId: string) {
     return this.documentsService.getPage(pageId);
   }
 
-  @Post()
-  async createPage(@Param('key') key: string, @Body() body: any) {
-    return this.documentsService.createPage(key, body, body.reporterId || 'system');
-  }
-
   @Put(':pageId')
-  async updatePage(@Param('pageId') pageId: string, @Body() body: any) {
-    return this.documentsService.updatePage(pageId, body, body.userId || 'system');
+  async updatePage(@Param('pageId') pageId: string, @Body() body: any, @Req() req: any) {
+    return this.documentsService.updatePage(
+      pageId,
+      body,
+      req.user?.id || body.userId || 'system',
+    );
   }
 
   @Delete(':pageId')
