@@ -87,6 +87,30 @@ export class SpacesService {
         data.createdById ?? '',
       );
       processWorkspaceIds = result.workspaces.map((w) => w.id);
+
+      // 템플릿 fieldDefinitions → 스페이스 field definitions 복사
+      const templateVersion = await this.prisma.templateVersion.findUnique({
+        where: { id: data.templateVersionId },
+        select: { fieldDefinitions: true },
+      });
+      const defs = (templateVersion?.fieldDefinitions as any[]) ?? [];
+      if (defs.length) {
+        await this.prisma.fieldDefinition.createMany({
+          data: defs.map((fd: any) => ({
+            spaceId: space.id,
+            key: fd.key,
+            label: fd.label ?? fd.key,
+            labelKo: fd.labelKo ?? null,
+            labelEn: fd.labelEn ?? null,
+            fieldType: fd.fieldType ?? 'text',
+            typeId: fd.typeId ?? null,
+            isRequired: !!fd.isRequired,
+            requiredForApproval: !!fd.requiredForApproval,
+            validation: fd.validation ?? {},
+            sortOrder: fd.sortOrder ?? 0,
+          })),
+        });
+      }
     }
 
     // 멤버 초대 (이메일 → 사용자 매핑 후 뷰어 역할 할당)

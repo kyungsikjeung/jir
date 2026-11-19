@@ -119,15 +119,54 @@ export class TraceabilityService {
     };
   }
 
+  async getLinks(spaceKey: string, itemId: string) {
+    const space = await this.space(spaceKey);
+    const item = await this.prisma.workItem.findUnique({ where: { id: itemId } });
+    if (!item || item.spaceId !== space.id) {
+      throw new NotFoundException(`Item not found: ${itemId}`);
+    }
+    const links = await this.prisma.traceLink.findMany({
+      where: { OR: [{ fromId: itemId }, { toId: itemId }] },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!links.length) return [];
+    const partnerIds = Array.from(
+      new Set(links.flatMap((l) => [l.fromId, l.toId]).filter((id) => id !== itemId)),
+    );
+    const partners = await this.prisma.workItem.findMany({
+      where: { id: { in: partnerIds } },
+      select: { id: true, key: true, title: true },
+    });
+    const keyById = new Map(partners.map((p) => [p.id, p.key]));
+    const titleById = new Map(partners.map((p) => [p.id, p.title]));
+    return links.map((l) => {
+      const isOutgoing = l.fromId === itemId;
+      const partnerId = isOutgoing ? l.toId : l.fromId;
+      return {
+        ...l,
+        direction: isOutgoing ? 'out' : 'in',
+        partnerKey: keyById.get(partnerId) ?? null,
+        partnerTitle: titleById.get(partnerId) ?? null,
+      };
+    });
+  }
+
   async markSuspect(changedItemId: string, reason?: string) {
     const links = await this.prisma.traceLink.findMany({
       where: { OR: [{ fromId: changedItemId }, { toId: changedItemId }] },
     });
+    if (!links.length) return { marked: 0 };
     await this.prisma.traceLink.updateMany({
       where: { OR: [{ fromId: changedItemId }, { toId: changedItemId }] },
       data: { isSuspect: true },
     });
+    // 이미 등록된 suspectLink는 중복 생성하지 않는다
+    const existing = await this.prisma.suspectLink.findMany({
+      where: { traceLinkId: { in: links.map((l) => l.id) } },
+    });
+    const existingIds = new Set(existing.map((e) => e.traceLinkId));
     for (const l of links) {
+      if (existingIds.has(l.id)) continue;
       await this.prisma.suspectLink.create({
         data: { traceLinkId: l.id, reason: reason || '연결된 항목이 변경됨' },
       });

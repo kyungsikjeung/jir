@@ -33,6 +33,11 @@ export class WorkItemsController {
     return this.workItemsService.getWbs(key);
   }
 
+  @Get(':issueKey/versions')
+  async getVersions(@Param('issueKey') issueKey: string) {
+    return this.workItemsService.getVersions(issueKey);
+  }
+
   @Get(':issueKey')
   async findOne(@Param('issueKey') issueKey: string) {
     return this.workItemsService.findByKey(issueKey);

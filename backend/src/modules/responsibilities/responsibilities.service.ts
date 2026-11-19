@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -102,5 +102,105 @@ export class ResponsibilitiesService {
       where: { id, spaceId: space.id },
     });
     return { success: true };
+  }
+
+  /** ProcessAssignment 기반 멤버 할당 조회 (스페이스의 process workspace 목록) */
+  async getAssignments(spaceKey: string) {
+    const space = await this.space(spaceKey);
+    const workspaces = await this.prisma.processWorkspace.findMany({
+      where: { spaceId: space.id },
+      orderBy: { processCode: 'asc' },
+    });
+    if (!workspaces.length) return [];
+    const assignments = await this.prisma.processAssignment.findMany({
+      where: { workspaceId: { in: workspaces.map((w) => w.id) } },
+      orderBy: { assignedAt: 'asc' },
+    });
+    const userIds = Array.from(new Set(assignments.map((a) => a.userId)));
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const userById = new Map(users.map((u) => [u.id, u]));
+    return assignments.map((a) => ({
+      id: a.id,
+      roleId: a.roleId,
+      userId: a.userId,
+      user: userById.get(a.userId) ?? null,
+      isPrimary: a.isPrimary,
+      aspiceProcess: workspaces.find((w) => w.id === a.workspaceId)?.processCode ?? null,
+    }));
+  }
+
+  /** 멤버 할당 (Owner: 단일이면 isPrimary 유지; Approver: 다중 허용) */
+  async assign(
+    spaceKey: string,
+    data: { roleId: string; userId: string; isPrimary?: boolean; aspiceProcess?: string },
+  ) {
+    const space = await this.space(spaceKey);
+    let workspace;
+    if (data.aspiceProcess) {
+      workspace = await this.prisma.processWorkspace.findFirst({
+        where: { spaceId: space.id, processCode: data.aspiceProcess },
+      });
+      if (!workspace) {
+        throw new NotFoundException(`Process workspace not found: ${data.aspiceProcess}`);
+      }
+    } else {
+      const workspaces = await this.prisma.processWorkspace.findMany({
+        where: { spaceId: space.id },
+      });
+      if (!workspaces.length) {
+        throw new BadRequestException('The space has no process workspaces.');
+      }
+      workspace = workspaces[0];
+    }
+
+    const roleAssignments = await this.prisma.processAssignment.findMany({
+      where: { workspaceId: workspace.id, roleId: data.roleId },
+    });
+    // 주 담당자는 단일: 새 할당이 주 담당자이면 기존 주 담당자를 밀어낸다
+    if (data.isPrimary) {
+      await this.prisma.processAssignment.updateMany({
+        where: {
+          workspaceId: workspace.id,
+          roleId: data.roleId,
+          userId: { not: data.userId },
+          isPrimary: true,
+        },
+        data: { isPrimary: false },
+      });
+    }
+    const existing = roleAssignments.find((a) => a.userId === data.userId);
+    if (existing) {
+      return this.prisma.processAssignment.update({
+        where: { id: existing.id },
+        data: { isPrimary: !!data.isPrimary || existing.isPrimary },
+      });
+    }
+    return this.prisma.processAssignment.create({
+      data: {
+        workspaceId: workspace.id,
+        roleId: data.roleId,
+        userId: data.userId,
+        isPrimary: !!data.isPrimary,
+      },
+    });
+  }
+
+  /** 멤버 해제 */
+  async unassign(spaceKey: string, assignmentId: string) {
+    const space = await this.space(spaceKey);
+    const workspaces = await this.prisma.processWorkspace.findMany({ where: { spaceId: space.id } });
+    const workspaceIds = workspaces.map((w) => w.id);
+    const existing = await this.prisma.processAssignment.findFirst({
+      where: { id: assignmentId, workspaceId: { in: workspaceIds } },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Assignment not found: ${assignmentId}`);
+    }
+    return this.prisma.processAssignment.delete({ where: { id: existing.id } });
   }
 }

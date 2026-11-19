@@ -24,6 +24,7 @@ import { ResponsibilitiesModule } from './modules/responsibilities/responsibilit
 import { GitModule } from './modules/git/git.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { TemplateModule } from './modules/templates/template.module';
+import { FieldDefinitionModule } from './modules/field-definitions/field-definition.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -52,6 +53,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     GitModule,
     AuditModule,
     TemplateModule,
+    FieldDefinitionModule,
   ],
   providers: [
     // 전역 JWT 인증 (@Public() 제외)

@@ -64,12 +64,30 @@ const ROLE_LABEL: Record<string, string> = {
 const roleLabel = (role: Role) =>
   ROLE_LABEL[role.name] ?? role.description?.replace(/\s*\(.+\)$/, '') ?? role.name;
 
+interface AssignmentRow {
+  id: string;
+  roleId: string;
+  userId: string;
+  user: { id: string; displayName: string; email: string } | null;
+  isPrimary: boolean;
+  aspiceProcess: string | null;
+}
+
+interface AssignTarget {
+  roleId: string;
+  roleName: string;
+  roleMembers: Array<{ id: string; displayName: string }>;
+}
+
 export default function ResponsibilityPage() {
   const { spaceKey } = useParams<{ spaceKey: string }>();
   const queryClient = useQueryClient();
   const [selection, setSelection] = useState<{ processCode: string; roleId: string } | null>(null);
   const [responsibility, setResponsibility] = useState('contributor');
   const [isPrimary, setIsPrimary] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
+  const [newMemberId, setNewMemberId] = useState('');
+  const [assignPrimary, setAssignPrimary] = useState(false);
 
   const { data: matrix, isLoading } = useQuery({
     queryKey: ['rr', spaceKey],
@@ -77,6 +95,43 @@ export default function ResponsibilityPage() {
       const res = await apiClient.get(`/api/spaces/${spaceKey}/rr`);
       return res.data as Matrix;
     },
+  });
+
+  const { data: assignments } = useQuery({
+    queryKey: ['rr-assignments', spaceKey],
+    queryFn: async () => {
+      const res = await apiClient.get(`/api/spaces/${spaceKey}/rr/assignments`);
+      return res.data as AssignmentRow[];
+    },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async () => {
+      await apiClient.post(`/api/spaces/${spaceKey}/rr/assignments`, {
+        roleId: assignTarget?.roleId,
+        userId: newMemberId,
+        isPrimary: assignPrimary,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rr-assignments', spaceKey] });
+      toast.success('멤버를 할당했습니다.');
+      setAssignTarget(null);
+      setNewMemberId('');
+      setAssignPrimary(false);
+    },
+    onError: () => toast.error('할당에 실패했습니다.'),
+  });
+
+  const unassignMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/api/spaces/${spaceKey}/rr/assignments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rr-assignments', spaceKey] });
+      toast.success('해제했습니다.');
+    },
+    onError: () => toast.error('해제하지 못했습니다.'),
   });
 
   const cellFor = (processCode: string, roleId: string) =>
@@ -246,6 +301,109 @@ export default function ResponsibilityPage() {
           </ul>
         </>
       )}
+
+      <section aria-label="멤버 할당" className="bg-white rounded-lg shadow p-5">
+        <h2 className="text-lg font-semibold mb-3">멤버 할당</h2>
+        {matrix?.roles.map((role) => {
+          const assigned = (assignments ?? []).filter((a) => a.roleId === role.id);
+          return (
+            <div key={role.id} className="mb-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">{roleLabel(role)}</h3>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                {assigned.map((a) => (
+                  <span
+                    key={a.id}
+                    className="flex items-center gap-1.5 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs"
+                  >
+                    <span>{a.user?.displayName ?? a.userId}</span>
+                    {a.isPrimary && <span title="주 담당자">★</span>}
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      onClick={() => unassignMutation.mutate(a.id)}
+                      disabled={unassignMutation.isPending}
+                    >
+                      해제
+                    </button>
+                  </span>
+                ))}
+                {assigned.length === 0 && (
+                  <span className="text-xs text-gray-400">할당된 멤버가 없습니다.</span>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setAssignTarget({
+                      roleId: role.id,
+                      roleName: roleLabel(role),
+                      roleMembers: role.members,
+                    });
+                    setNewMemberId(role.members[0]?.id ?? '');
+                    setAssignPrimary(false);
+                  }}
+                >
+                  멤버 추가
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <Modal
+        open={!!assignTarget}
+        onClose={() => setAssignTarget(null)}
+        title={`${assignTarget?.roleName ?? ''} · 멤버 할당`}
+      >
+        {assignTarget && (
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newMemberId) assignMutation.mutate();
+            }}
+          >
+            <div className="field">
+              <label htmlFor="rr-assign-member">할당 멤버</label>
+              <select
+                id="rr-assign-member"
+                value={newMemberId}
+                onChange={(e) => setNewMemberId(e.target.value)}
+                required
+              >
+                <option value="">(선택)</option>
+                {assignTarget.roleMembers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={assignPrimary}
+                onChange={(e) => setAssignPrimary(e.target.checked)}
+                style={{ inlineSize: '1.1rem', blockSize: '1.1rem' }}
+              />
+              주 담당자로 지정
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn btn-secondary" onClick={() => setAssignTarget(null)}>
+                취소
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!newMemberId || assignMutation.isPending}
+              >
+                할당
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       <Modal
         open={!!selection}

@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FieldDefinitionService } from '../field-definitions/field-definition.service';
+import { TraceabilityService } from '../traceability/traceability.service';
 
 @Injectable()
 export class WorkItemsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private fieldDefinitionService: FieldDefinitionService,
+    private traceabilityService: TraceabilityService,
+  ) {}
 
   async findAll(spaceKey: string, filters?: { status?: string; priority?: string; assigneeId?: string; type?: string }) {
     const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
@@ -129,6 +135,7 @@ export class WorkItemsService {
       aspiceProcess?: string;
       asilLevel?: string;
       body?: any;
+      customFields?: any;
     },
     reporterId: string,
   ) {
@@ -143,6 +150,9 @@ export class WorkItemsService {
       if (!type) throw new NotFoundException(`Work item type not found: ${data.type || 'task'}`);
       typeId = type.id;
     }
+
+    // customFields 서버 검증 (필수 필드·타입별 검증)
+    await this.validateCustomFields(space.id, typeId, data.customFields);
 
     const initial = await this.prisma.workflow.findFirst({
       where: { spaceId: space.id, isDefault: true },
@@ -170,6 +180,7 @@ export class WorkItemsService {
         labels: data.labels || [],
         aspiceProcess: data.aspiceProcess,
         asilLevel: data.asilLevel,
+        customFields: data.customFields ?? {},
         body: data.body,
         bodyText: data.body ? this.extractText(data.body) : data.description ?? null,
       },
@@ -190,13 +201,20 @@ export class WorkItemsService {
       estimatedHours?: number;
       actualHours?: number;
       dueDate?: string | Date | null;
+      customFields?: any;
+      parentId?: string;
     },
     userId?: string,
   ) {
     const item = await this.findByKey(key);
     const newVersion = item.version + 1;
 
-    return this.prisma.$transaction(async (tx) => {
+    // customFields 서버 검증 (필수 필드·타입별 검증)
+    if (data.customFields) {
+      await this.validateCustomFields(item.spaceId, item.typeId, data.customFields);
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.workItem.update({
         where: { id: item.id },
         data: {
@@ -206,9 +224,11 @@ export class WorkItemsService {
           priority: data.priority ?? item.priority,
           assigneeId:
             data.assigneeId === undefined ? item.assigneeId : data.assigneeId || null,
+          parentId: data.parentId === undefined ? item.parentId : data.parentId,
           labels: data.labels ?? item.labels,
           body: data.body ?? item.body,
           bodyText: data.body ? this.extractText(data.body) : item.bodyText,
+          customFields: data.customFields ?? item.customFields,
           progressPercent: data.progressPercent ?? item.progressPercent,
           estimatedHours: data.estimatedHours ?? item.estimatedHours,
           actualHours: data.actualHours ?? item.actualHours,
@@ -237,6 +257,33 @@ export class WorkItemsService {
 
       return updated;
     });
+
+    // 영향받는 추적 링크를 suspect로 표시
+    await this.traceabilityService.markSuspect(item.id, '작업 항목 변경 시');
+    return updated;
+  }
+
+  /** 작업 항목 버전 이력 (새 → 오래된 순) */
+  async getVersions(issueKey: string) {
+    const item = await this.findByKey(issueKey);
+    const versions = await this.prisma.workItemVersion.findMany({
+      where: { workItemId: item.id },
+      orderBy: { version: 'desc' },
+    });
+    const changedIds = Array.from(
+      new Set(versions.map((v) => v.changedById).filter(Boolean)),
+    );
+    const users = changedIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: changedIds as string[] } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const userById = new Map(users.map((u) => [u.id, u]));
+    return versions.map((v) => ({
+      ...v,
+      changedBy: v.changedById ? userById.get(v.changedById) ?? null : null,
+    }));
   }
 
   async delete(key: string) {
@@ -306,38 +353,160 @@ export class WorkItemsService {
   /**
    * 워크플로우 전이
    * @param transitionName 상태 이름 (예: "In Review", "Approved") 또는 상태 ID
+   * @throws BadRequestException 전이가 없거나 guard condition이 통과하지 않을 때
    */
   async transition(issueKey: string, transitionName: string, userId: string, comment?: string) {
     const item = await this.findByKey(issueKey);
 
-    const state = await this.prisma.workflowState.findFirst({
+    // 목표 상태
+    const targetState = await this.prisma.workflowState.findFirst({
       where: {
         OR: [{ id: transitionName }, { name: { equals: transitionName, mode: 'insensitive' } }],
       },
     });
-
-    const data: any = { updatedAt: new Date() };
-    if (state) {
-      data.workflowStateId = state.id;
-      data.status = state.name;
-      data.resolvedAt = state.category === 'done' ? new Date() : null;
-    } else {
-      data.status = transitionName;
-      data.resolvedAt = ['done', 'released', 'closed', 'resolved'].includes(transitionName) ? new Date() : null;
+    if (!targetState) {
+      throw new BadRequestException(`Transition not allowed: ${transitionName}`);
     }
 
+    // 현재 상태
+    const currentState = item.workflowStateId
+      ? await this.prisma.workflowState.findUnique({ where: { id: item.workflowStateId } })
+      : null;
+
+    // fromStateId → toStateId 전이 존재 확인 (현재 상태에서 목표 상태로)
+    const candidates = await this.prisma.workflowTransition.findMany({
+      where: { workflowId: targetState.workflowId, toStateId: targetState.id },
+    });
+    const transition =
+      candidates.find((t) => t.fromStateId === currentState?.id) ??
+      (currentState ? null : candidates.find((t) => t.fromStateId === null));
+    if (!transition) {
+      throw new BadRequestException(`Transition not allowed: ${transitionName}`);
+    }
+
+    // guard condition 평가
+    if (!this.evaluateCondition(transition, item)) {
+      throw new BadRequestException(`Transition blocked by condition: ${transitionName}`);
+    }
+
+    const data: any = {
+      workflowStateId: targetState.id,
+      status: targetState.name,
+      resolvedAt: targetState.category === 'done' ? new Date() : null,
+      updatedAt: new Date(),
+    };
     const updated = await this.prisma.workItem.update({ where: { id: item.id }, data });
 
+    // postActions 실행
+    await this.runPostActions(transition.postActions, updated, userId);
+
+    // 전이 이력 기록 (transitionId, fromStateId 포함)
     await this.prisma.workflowTransitionHistory.create({
       data: {
         workItemId: item.id,
-        toStateId: state?.id,
+        transitionId: transition.id,
+        fromStateId: currentState?.id ?? null,
+        toStateId: targetState.id,
         performedById: userId,
         comment,
       },
     });
 
     return updated;
+  }
+
+  /** transition guard condition 평가 (conditionType + conditionConfig) */
+  private evaluateCondition(transition: any, item: any): boolean {
+    const type = transition.conditionType;
+    if (!type) return true;
+    const cfg = transition.conditionConfig || {};
+    const customFields = (item.customFields || {}) as Record<string, any>;
+    switch (type) {
+      case 'required_fields': {
+        const fields = Array.isArray(cfg.fields) ? cfg.fields : [];
+        return fields.every(
+          (k: string) =>
+            customFields[k] !== undefined && customFields[k] !== null && customFields[k] !== '',
+        );
+      }
+      case 'field_equals': {
+        const key = cfg.key ?? cfg.field;
+        if (!key) return true;
+        return customFields[key] === cfg.value;
+      }
+      default:
+        return true;
+    }
+  }
+
+  /** 전이 후 실행할 postActions (postActions JSON) */
+  private async runPostActions(postActions: any, item: any, userId: string) {
+    const actions = Array.isArray(postActions) ? postActions : [];
+    if (!actions.length) return;
+    for (const action of actions) {
+      if (!action || typeof action !== 'object') continue;
+      switch (action.type) {
+        case 'set_field': {
+          const key = action.key ?? action.field;
+          if (!key) break;
+          await this.prisma.workItem.update({
+            where: { id: item.id },
+            data: { customFields: { ...(item.customFields || {}), [key]: action.value ?? null } },
+          });
+          break;
+        }
+        // 알 수 없는 postAction은 실행하지 않는다
+      }
+    }
+  }
+
+  /** customFields 서버 검증: 필수 필드·타입별 검증 */
+  private async validateCustomFields(
+    spaceId: string,
+    typeId: string,
+    customFields: Record<string, any> | undefined,
+  ) {
+    if (!customFields) return;
+    const fields = await this.fieldDefinitionService.findAll(spaceId, typeId);
+    for (const field of fields) {
+      const val = customFields[field.key];
+      if (field.isRequired && (val === undefined || val === null || val === '')) {
+        throw new BadRequestException(`Required field missing: ${field.key}`);
+      }
+      const err = this.checkFieldType(field, val);
+      if (err) throw new BadRequestException(err);
+    }
+  }
+
+  /** customFields 필드 타입별 검증 (number/decimal/select/multiselect) */
+  private checkFieldType(field: any, val: any): string | null {
+    if (val === undefined || val === null || val === '') return null;
+    switch (field.fieldType) {
+      case 'number':
+      case 'decimal': {
+        const n = typeof val === 'number' ? val : Number(val);
+        if (!Number.isFinite(n)) return `Field ${field.key} must be a number`;
+        return null;
+      }
+      case 'select':
+      case 'multiselect': {
+        const options = Array.isArray(field.validation?.options)
+          ? (field.validation.options as any[])
+          : null;
+        if (options) {
+          const values = Array.isArray(val) ? val : [val];
+          for (const v of values) {
+            const ok = options.some(
+              (o) => (typeof o === 'string' ? o === v : o && o.value === v),
+            );
+            if (!ok) return `Field ${field.key} has invalid value`;
+          }
+        }
+        return null;
+      }
+      default:
+        return null;
+    }
   }
 
   private extractText(body: any): string {

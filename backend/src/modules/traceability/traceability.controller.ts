@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, Query } from '@nestjs/common';
 import { TraceabilityService } from './traceability.service';
 
 @Controller('spaces/:key/trace')
@@ -18,6 +18,11 @@ export class TraceabilityController {
   @Get('suspect')
   async getSuspectLinks(@Param('key') key: string) {
     return this.traceabilityService.getSuspectLinks(key);
+  }
+
+  @Get('links')
+  async getLinks(@Param('key') key: string, @Query('itemId') itemId: string) {
+    return this.traceabilityService.getLinks(key, itemId);
   }
 
   @Post('links')

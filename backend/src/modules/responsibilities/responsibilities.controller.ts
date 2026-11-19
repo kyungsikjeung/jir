@@ -28,4 +28,22 @@ export class ResponsibilitiesController {
   async remove(@Param('key') key: string, @Param('id') id: string) {
     return this.service.remove(key, id);
   }
+
+  @Get('assignments')
+  async getAssignments(@Param('key') key: string) {
+    return this.service.getAssignments(key);
+  }
+
+  @Post('assignments')
+  async assign(
+    @Param('key') key: string,
+    @Body() body: { roleId: string; userId: string; isPrimary?: boolean },
+  ) {
+    return this.service.assign(key, body);
+  }
+
+  @Delete('assignments/:id')
+  async unassign(@Param('key') key: string, @Param('id') id: string) {
+    return this.service.unassign(key, id);
+  }
 }

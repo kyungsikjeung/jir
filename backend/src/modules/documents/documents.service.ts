@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TraceabilityService } from '../traceability/traceability.service';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private traceabilityService: TraceabilityService,
+  ) {}
 
   private async space(key: string) {
     const space = await this.prisma.space.findUnique({ where: { key } });
@@ -163,7 +167,7 @@ export class DocumentsService {
           ? this.extractText(data.body)
           : page.bodyText;
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.workItem.update({
         where: { id: pageId },
         data: {
@@ -186,6 +190,10 @@ export class DocumentsService {
       });
       return updated;
     });
+
+    // 영향받는 추적 링크를 suspect로 표시
+    await this.traceabilityService.markSuspect(pageId, '문서 변경 시');
+    return updated;
   }
 
   async deletePage(pageId: string) {

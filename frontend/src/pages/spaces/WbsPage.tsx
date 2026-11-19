@@ -3,13 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import apiClient from '../../services/api.client';
-import Modal from '../../components/Modal';
+import Modal, { ConfirmDialog } from '../../components/Modal';
 import { StatusBadge } from '../../components/StatusBadge';
 
 interface WbsNode {
   id: string;
   key: string;
   title: string;
+  parentId: string | null;
   status: string;
   priority: string;
   progressPercent: number;
@@ -61,7 +62,11 @@ export default function WbsPage() {
   const { spaceKey } = useParams<{ spaceKey: string }>();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<WbsNode | null>(null);
+  const [createParent, setCreateParent] = useState<WbsNode | null>(null);
+  const [childForm, setChildForm] = useState({ title: '', assigneeId: '', dueDate: '' });
+  const [deleteTarget, setDeleteTarget] = useState<WbsNode | null>(null);
   const [form, setForm] = useState({
+    parentId: '',
     assigneeId: '',
     estimatedHours: '',
     progressPercent: '0',
@@ -91,6 +96,7 @@ export default function WbsPage() {
     mutationFn: async () => {
       if (!editing) return;
       await apiClient.put(`/api/spaces/${spaceKey}/issues/${editing.key}`, {
+        parentId: form.parentId || null,
         assigneeId: form.assigneeId,
         estimatedHours: form.estimatedHours === '' ? undefined : Number(form.estimatedHours),
         progressPercent: Number(form.progressPercent),
@@ -107,9 +113,43 @@ export default function WbsPage() {
     onError: () => toast.error('저장하지 못했습니다.'),
   });
 
+  const createChild = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.post(`/api/spaces/${spaceKey}/issues`, {
+        parentId: createParent?.id,
+        title: childForm.title,
+        assigneeId: childForm.assigneeId || undefined,
+        dueDate: childForm.dueDate || null,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wbs', spaceKey] });
+      queryClient.invalidateQueries({ queryKey: ['issues', spaceKey] });
+      toast.success('자식 작업을 추가했습니다.');
+      setCreateParent(null);
+      setChildForm({ title: '', assigneeId: '', dueDate: '' });
+    },
+    onError: () => toast.error('자식 작업 추가에 실패했습니다.'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (key: string) => {
+      await apiClient.delete(`/api/spaces/${spaceKey}/issues/${key}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wbs', spaceKey] });
+      queryClient.invalidateQueries({ queryKey: ['issues', spaceKey] });
+      toast.success('작업을 삭제했습니다.');
+      setDeleteTarget(null);
+    },
+    onError: () => toast.error('삭제하지 못했습니다.'),
+  });
+
   const openEdit = (node: WbsNode) => {
     setEditing(node);
     setForm({
+      parentId: node.parentId ?? '',
       assigneeId: node.assigneeId ?? '',
       estimatedHours: node.estimatedHours != null ? String(node.estimatedHours) : '',
       progressPercent: String(node.progressPercent ?? 0),
@@ -235,14 +275,35 @@ export default function WbsPage() {
                   </td>
                   <td data-label="마감일">{formatDate(node.dueDate)}</td>
                   <td data-label="작업">
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => openEdit(node)}
-                      aria-label={`${node.key} 작업 할당 편집`}
-                    >
-                      편집
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => openEdit(node)}
+                        aria-label={`${node.key} 작업 할당 편집`}
+                      >
+                        편집
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setChildForm({ title: '', assigneeId: '', dueDate: '' });
+                          setCreateParent(node);
+                        }}
+                        aria-label={`${node.key} 자식 작업 추가`}
+                      >
+                        자식 추가
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => setDeleteTarget(node)}
+                        aria-label={`${node.key} 삭제`}
+                      >
+                        삭제
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -272,6 +333,24 @@ export default function WbsPage() {
                     {member.role ? ` · ${member.role.name}` : ''}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="wbs-parent">상위 작업</label>
+              <select
+                id="wbs-parent"
+                value={form.parentId}
+                onChange={(e) => setForm({ ...form, parentId: e.target.value })}
+              >
+                <option value="">(루트)</option>
+                {rows
+                  .filter((r) => r.node.id !== editing?.id)
+                  .map((r) => (
+                    <option key={r.node.id} value={r.node.id}>
+                      {r.node.key} · {r.node.title}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -342,6 +421,89 @@ export default function WbsPage() {
           </form>
         )}
       </Modal>
+
+      {/* 자식 작업 추가 */}
+      <Modal
+        open={!!createParent}
+        onClose={() => setCreateParent(null)}
+        title={`${createParent?.key} · 자식 작업 생성`}
+      >
+        {createParent && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!childForm.title.trim()) return;
+              createChild.mutate();
+            }}
+            noValidate
+            className="flex flex-col gap-4"
+          >
+            <p className="text-sm text-gray-600">
+              부모: <span className="font-medium">{createParent.key}</span> · {createParent.title}
+            </p>
+            <div className="field">
+              <label htmlFor="wbs-child-title">제목</label>
+              <input
+                id="wbs-child-title"
+                type="text"
+                required
+                value={childForm.title}
+                onChange={(e) => setChildForm({ ...childForm, title: e.target.value })}
+                placeholder="제목을 입력하세요"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="wbs-child-assignee">담당자</label>
+              <select
+                id="wbs-child-assignee"
+                value={childForm.assigneeId}
+                onChange={(e) => setChildForm({ ...childForm, assigneeId: e.target.value })}
+              >
+                <option value="">(미지정)</option>
+                {(members ?? []).map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.user?.displayName ?? member.userId}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="wbs-child-due">마감일</label>
+              <input
+                id="wbs-child-due"
+                type="date"
+                value={childForm.dueDate}
+                onChange={(e) => setChildForm({ ...childForm, dueDate: e.target.value })}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setCreateParent(null)}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={createChild.isPending}
+              >
+                자식 작업 추가
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="작업 삭제"
+        message={`${deleteTarget?.key} ${deleteTarget?.title ?? ''}을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+        confirmLabel="삭제"
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.key)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

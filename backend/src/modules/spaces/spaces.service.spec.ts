@@ -9,6 +9,8 @@ function createPrismaMock() {
     user: { findMany: jest.fn() },
     role: { findFirst: jest.fn() },
     spaceMember: { createMany: jest.fn() },
+    templateVersion: { findUnique: jest.fn().mockResolvedValue(null) },
+    fieldDefinition: { createMany: jest.fn() },
     $transaction: jest.fn(async (cb: any) => cb({
       space: { create: jest.fn() },
       spaceSettings: { create: jest.fn() },
@@ -76,6 +78,17 @@ describe('SpacesService.create', () => {
     templateService.instantiate.mockResolvedValue({
       workspaces: [{ id: 'ws1' }, { id: 'ws2' }],
     });
+    prisma.templateVersion.findUnique.mockResolvedValue({
+      fieldDefinitions: [
+        {
+          key: 'hazard_level',
+          label: 'Hazard Level',
+          fieldType: 'select',
+          isRequired: true,
+          validation: { options: ['low', 'high'] },
+        },
+      ],
+    });
 
     const result = await service.create({
       name: 'Demo',
@@ -87,6 +100,24 @@ describe('SpacesService.create', () => {
 
     expect(result.processWorkspaceIds).toEqual(['ws1', 'ws2']);
     expect(templateService.instantiate).toHaveBeenCalledWith('s1', 'tv1', 'u1');
+    // 템플릿 fieldDefinitions → 스페이스 field definitions 복사
+    expect(prisma.fieldDefinition.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          spaceId: 's1',
+          key: 'hazard_level',
+          label: 'Hazard Level',
+          labelKo: null,
+          labelEn: null,
+          fieldType: 'select',
+          typeId: null,
+          isRequired: true,
+          requiredForApproval: false,
+          validation: { options: ['low', 'high'] },
+          sortOrder: 0,
+        },
+      ],
+    });
   });
 
   it('멤버 이메일로 사용자를 초대해 뷰어 역할을 할당한다', async () => {
