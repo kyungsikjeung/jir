@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body } from '@nestjs/common';
 import { WorkflowsService } from './workflows.service';
 
 @Controller('spaces/:key')
@@ -33,6 +33,16 @@ export class WorkflowsController {
   @Post('reviews')
   async createReview(@Param('key') key: string, @Body() body: any) {
     return this.workflowsService.createReview(key, body, body.createdById || 'system');
+  }
+
+  @Get('reviews/:id')
+  async getReview(@Param('id') id: string) {
+    return this.workflowsService.getReview(id);
+  }
+
+  @Patch('reviews/:id')
+  async updateReview(@Param('id') id: string, @Body() body: any) {
+    return this.workflowsService.updateReview(id, body);
   }
 
   @Post('reviews/:id/findings')

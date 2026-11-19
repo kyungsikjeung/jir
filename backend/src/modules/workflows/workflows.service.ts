@@ -37,6 +37,56 @@ export class WorkflowsService {
     return this.prisma.review.findMany({ where: { spaceId: space.id },  });
   }
 
+  async getReview(reviewId: string) {
+    const review = await this.prisma.review.findUnique({ where: { id: reviewId } });
+    if (!review) throw new NotFoundException(`Review not found: ${reviewId}`);
+
+    const [findings, participants] = await Promise.all([
+      this.prisma.reviewFinding.findMany({
+        where: { reviewId },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.reviewParticipant.findMany({ where: { reviewId } }),
+    ]);
+    const userIds = Array.from(new Set(participants.map((p) => p.userId)));
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const userById = new Map(users.map((u) => [u.id, u]));
+    return {
+      ...review,
+      findings,
+      participants: participants.map((p) => ({
+        userId: p.userId,
+        role: p.role,
+        status: p.status,
+        user: userById.get(p.userId) ?? null,
+      })),
+    };
+  }
+
+  /** 리뷰 상태 변경 (terminal 상태이면 completedAt 자동 설정) */
+  async updateReview(
+    reviewId: string,
+    data: { status?: string; completedAt?: Date | null },
+  ) {
+    const review = await this.prisma.review.findUnique({ where: { id: reviewId } });
+    if (!review) throw new NotFoundException(`Review not found: ${reviewId}`);
+
+    const status = data.status ?? review.status;
+    const completedAt =
+      data.completedAt !== undefined
+        ? data.completedAt
+        : ['done', 'completed', 'closed', 'rejected'].includes(status) && !review.completedAt
+          ? new Date()
+          : review.completedAt;
+
+    return this.prisma.review.update({ where: { id: reviewId }, data: { status, completedAt } });
+  }
+
   async createReview(spaceKey: string, data: any, userId: string) {
     const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
     if (!space) throw new NotFoundException(`Space not found: ${spaceKey}`);
