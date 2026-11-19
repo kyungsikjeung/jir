@@ -130,8 +130,7 @@ describe('AuditService', () => {
       },
     ]);
 
-    const result = await service.verifyChain('wi', '1');
-    expect(result).toBe(true);
+    expect(await service.verifyChain('wi', '1')).toBe(true);
   });
 
   it('verifyChain 은 해시가 위조되면 false 를 반환한다', async () => {
@@ -142,7 +141,33 @@ describe('AuditService', () => {
       },
     ]);
 
-    const result = await service.verifyChain('wi', '1');
-    expect(result).toBe(false);
+    expect(await service.verifyChain('wi', '1')).toBe(false);
+  });
+
+  it('verifyChain 은 빈 체인 에 대해 true 를 반환한다', async () => {
+    prisma.auditLog.findMany.mockResolvedValue([]);
+    expect(await service.verifyChain('wi', '1')).toBe(true);
+  });
+});
+
+describe('AuditService.findAll', () => {
+  it('필터(entityType/entityId/actorId/action)로 감사 로그를 조회한다', async () => {
+    const prisma = createPrismaMock();
+    const service = new AuditService(prisma as any);
+    prisma.auditLog.findMany.mockResolvedValue([{ id: 'a1' }]);
+
+    const logs = await service.findAll({
+      entityType: 'space',
+      entityId: 's1',
+      actorId: 'u1',
+      action: 'create',
+    });
+
+    expect(logs).toHaveLength(1);
+    expect(prisma.auditLog.findMany).toHaveBeenCalledWith({
+      where: { entityType: 'space', entityId: 's1', actorId: 'u1', action: 'create' },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
   });
 });

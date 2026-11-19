@@ -96,7 +96,7 @@
 // POST /api/audit/verify (신규) — chainHash 검증 (verifyChain)
 ```
 **테스트:** `audit.service.spec.ts` — findAll 필터, 해시 체인 검증
-**완료:** 감사 페이지(해시 체인 검증 UI, EvidenceLink 표시)
+**완료:** 감사 페이지(해시 체인 검증 UI, EvidenceLink 표시), 해시 체인 검증 테스트
 
 ---
 
