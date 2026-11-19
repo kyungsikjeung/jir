@@ -154,7 +154,7 @@ export default function IssueDetailPage() {
 
   const approvalMutation = useMutation({
     mutationFn: async () =>
-      apiClient.post('/api/workflows/approvals', {
+      apiClient.post(`/api/spaces/${spaceKey}/approvals`, {
         entityType: 'work_item',
         entityId: issue.id,
         approverId: me?.id || 'system',

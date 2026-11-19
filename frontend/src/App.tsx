@@ -23,6 +23,7 @@ import WbsPage from './pages/spaces/WbsPage';
 import ResponsibilityPage from './pages/spaces/ResponsibilityPage';
 import ReviewsListPage from './pages/spaces/ReviewsListPage';
 import ReviewDetailPage from './pages/spaces/ReviewDetailPage';
+import ApprovalsPage from './pages/spaces/ApprovalsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const queryClient = new QueryClient({
@@ -52,6 +53,7 @@ export default function App() {
                 <Route path="rr" element={<ResponsibilityPage />} />
               <Route path="reviews" element={<ReviewsListPage />} />
               <Route path="reviews/:reviewId" element={<ReviewDetailPage />} />
+              <Route path="approvals" element={<ApprovalsPage />} />
                 <Route path="docs" element={<DocsTreePage />} />
                 <Route path="docs/:pageId" element={<PageDetailPage />} />
                 <Route path="trace" element={<TraceabilityPage />} />
