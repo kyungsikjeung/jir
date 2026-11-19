@@ -41,6 +41,17 @@ interface ProcessDetail {
   deliverableCatalog: Array<{ id: string; name: string; shortName?: string | null }>;
 }
 
+interface BaselineRow {
+  id: string;
+  name: string;
+  version?: string | null;
+  baselineType: string;
+  status: string;
+  isLocked: boolean;
+  lockReason?: string | null;
+  createdAt: string;
+}
+
 const STATUS_LABEL: Record<string, string> = {
   not_started: '시작 전',
   in_progress: '진행 중',
@@ -54,6 +65,9 @@ export default function CompliancePage() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [lockTarget, setLockTarget] = useState<BaselineRow | null>(null);
+  const [lockReason, setLockReason] = useState('');
+  const [diffTarget, setDiffTarget] = useState<BaselineRow | null>(null);
 
   const { data: compliance, isLoading } = useQuery({
     queryKey: ['compliance', spaceKey],
@@ -61,6 +75,38 @@ export default function CompliancePage() {
       const res = await apiClient.get(`/api/spaces/${spaceKey}/compliance`);
       return res.data as ProcessSummary[];
     },
+  });
+
+  const { data: baselines, isLoading: baselinesLoading } = useQuery({
+    queryKey: ['compliance-baselines', spaceKey],
+    queryFn: async () => {
+      const res = await apiClient.get(`/api/spaces/${spaceKey}/compliance/baselines`);
+      return res.data as BaselineRow[];
+    },
+  });
+
+  const { data: diff, isLoading: diffLoading } = useQuery({
+    queryKey: ['compliance-baseline-diff', spaceKey, diffTarget?.id],
+    queryFn: async () => {
+      const res = await apiClient.get(
+        `/api/spaces/${spaceKey}/compliance/baselines/${diffTarget!.id}/diff`,
+      );
+      return res.data;
+    },
+    enabled: !!diffTarget,
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: () =>
+      apiClient.post(`/api/spaces/${spaceKey}/compliance/baselines/${lockTarget!.id}/lock`, {
+        reason: lockReason || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('기준선이 잠겼습니다.');
+      queryClient.invalidateQueries({ queryKey: ['compliance-baselines', spaceKey] });
+      setLockTarget(null);
+    },
+    onError: () => toast.error('기준선 잠금에 실패했습니다.'),
   });
 
   const { data: detail, isLoading: detailLoading } = useQuery({
@@ -301,6 +347,150 @@ export default function CompliancePage() {
               )}
             </section>
           </div>
+        )}
+      </Modal>
+
+      {/* 기준선 (Baselines) — 비교/잠금 */}
+      <section aria-labelledby="baseline-heading" className="bg-white rounded-lg shadow p-6">
+        <h2 id="baseline-heading" className="text-lg font-semibold mb-3">
+          기준선 (Baselines)
+        </h2>
+        {baselinesLoading ? (
+          <p role="status">Loading...</p>
+        ) : (
+          <>
+            <DataTable<BaselineRow>
+              caption={`${spaceKey} 스페이스 기준선 목록`}
+              rowKey={(b) => b.id}
+              columns={[
+                { key: 'name', header: 'Name', sortable: true, value: (b) => b.name },
+                { key: 'version', header: 'Version', sortable: true, value: (b) => b.version ?? '' },
+                { key: 'baselineType', header: 'Type', value: (b) => b.baselineType },
+                { key: 'status', header: 'Status', sortable: true, value: (b) => b.status },
+                {
+                  key: 'isLocked',
+                  header: '잠금',
+                  sortable: true,
+                  value: (b) => (b.isLocked ? 1 : 0),
+                  render: (b) =>
+                    b.isLocked ? (
+                      <span className="badge badge-approved">잠금</span>
+                    ) : (
+                      <span className="badge badge-obsolete">—</span>
+                    ),
+                },
+                { key: 'lockReason', header: '잠금 사유', value: (b) => b.lockReason ?? '' },
+                {
+                  key: 'actions',
+                  header: '',
+                  value: () => 0,
+                  render: (b) => (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setDiffTarget((d) => (d && d.id === b.id ? null : b))}
+                      >
+                        {diffTarget?.id === b.id ? '비교 닫기' : '비교'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={b.isLocked}
+                        onClick={() => {
+                          setLockTarget(b);
+                          setLockReason('');
+                        }}
+                      >
+                        잠금
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              rows={baselines ?? []}
+              emptyText="기준선이 없습니다."
+            />
+            {diffTarget && diff && (
+              <div
+                className="mt-4 pt-4 border-t border-gray-100"
+                aria-labelledby="baseline-diff-heading"
+              >
+                <h3 id="baseline-diff-heading" className="text-sm font-semibold mb-2">
+                  {diffTarget.name} — 기준선 비교
+                </h3>
+                {diffLoading ? (
+                  <p role="status">Loading...</p>
+                ) : diff.changedSinceBaseline.length === 0 && diff.addedSinceBaseline.length === 0 ? (
+                  <p className="text-sm text-gray-500">변경된 항목이 없습니다.</p>
+                ) : (
+                  <ul
+                    className="text-sm"
+                    style={{ listStyle: 'none', padding: 0 }}
+                  >
+                    {diff.changedSinceBaseline.map((c: any) => (
+                      <li key={c.itemId}>
+                        변경됨: {c.itemId} ({c.baselineVersion} → {c.currentVersion})
+                      </li>
+                    ))}
+                    {diff.addedSinceBaseline.map((c: any) => (
+                      <li key={c.itemId}>
+                        추가됨: {c.itemId} (현재 {c.currentVersion})
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <Modal
+        open={!!lockTarget}
+        onClose={() => setLockTarget(null)}
+        title={`${lockTarget?.name ?? ''} · 잠금`}
+      >
+        {lockTarget && (
+          <form
+            className="flex flex-col gap-4"
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              lockMutation.mutate();
+            }}
+          >
+            <div className="field">
+              <label htmlFor="baseline-lock-reason">잠금 사유 (선택)</label>
+              <input
+                id="baseline-lock-reason"
+                type="text"
+                maxLength={200}
+                placeholder="예: 기준선 고정"
+                value={lockReason}
+                onChange={(e) => setLockReason(e.target.value)}
+              />
+            </div>
+            <p className="text-sm text-gray-500">
+              잠금 후 기준선의 BaselineItem 변경이 금지됩니다.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setLockTarget(null)}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={lockMutation.isPending}
+              >
+                {lockMutation.isPending ? '잠글 중…' : '잠금'}
+              </button>
+            </div>
+          </form>
         )}
       </Modal>
     </div>
