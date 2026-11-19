@@ -102,8 +102,63 @@ export class WorkflowsService {
   }
 
   async createApproval(data: any, userId: string) {
-    return this.prisma.approval.create({
-      data: { entityType: data.entityType, entityId: data.entityId, approverId: userId, decision: data.decision, comment: data.comment, signature: data.signature, signatureMethod: data.signatureMethod },
+    const approval = await this.prisma.approval.create({
+      data: {
+        entityType: data.entityType,
+        entityId: data.entityId,
+        approverId: userId,
+        decision: data.decision,
+        comment: data.comment,
+        signature: data.signature,
+        signatureMethod: data.signatureMethod,
+      },
     });
+    // decision='approved' 시 작업 항목 status 반영
+    if (data.decision === 'approved') {
+      const item = await this.prisma.workItem.findUnique({ where: { id: data.entityId } });
+      if (item && item.spaceId) {
+        await this.prisma.workItem.update({ where: { id: item.id }, data: { status: 'Approved' } });
+      }
+    }
+    return approval;
+  }
+
+  /** 승인 목록 조회 (work_item 기준 spaceId 검증 + approver/item 정보 부착) */
+  async getApprovals(spaceKey: string) {
+    const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
+    if (!space) throw new NotFoundException(`Space not found: ${spaceKey}`);
+
+    const items = await this.prisma.workItem.findMany({
+      where: { spaceId: space.id },
+      select: { id: true },
+    });
+    const itemIds = items.map((i) => i.id);
+
+    const [approvals, itemRows] = await Promise.all([
+      this.prisma.approval.findMany({
+        where: { entityType: 'work_item', entityId: { in: itemIds } },
+        orderBy: { decidedAt: 'desc' },
+      }),
+      this.prisma.workItem.findMany({
+        where: { id: { in: itemIds } },
+        select: { id: true, key: true, title: true },
+      }),
+    ]);
+
+    const approverIds = Array.from(new Set(approvals.map((a) => a.approverId)));
+    const users = approverIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: approverIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const userById = new Map(users.map((u) => [u.id, u]));
+    const itemInfo = new Map(itemRows.map((i) => [i.id, { key: i.key, title: i.title }]));
+
+    return approvals.map((a) => ({
+      ...a,
+      approver: userById.get(a.approverId) ?? null,
+      item: itemInfo.get(a.entityId) ?? null,
+    }));
   }
 }

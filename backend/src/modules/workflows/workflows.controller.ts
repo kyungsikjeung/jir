@@ -54,4 +54,9 @@ export class WorkflowsController {
   async createApproval(@Body() body: any) {
     return this.workflowsService.createApproval(body, body.approverId || 'system');
   }
+
+  @Get('approvals')
+  async getApprovals(@Param('key') key: string) {
+    return this.workflowsService.getApprovals(key);
+  }
 }
