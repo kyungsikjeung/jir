@@ -21,6 +21,8 @@ import CompliancePage from './pages/spaces/CompliancePage';
 import ExportPage from './pages/spaces/ExportPage';
 import WbsPage from './pages/spaces/WbsPage';
 import ResponsibilityPage from './pages/spaces/ResponsibilityPage';
+import ReviewsListPage from './pages/spaces/ReviewsListPage';
+import ReviewDetailPage from './pages/spaces/ReviewDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const queryClient = new QueryClient({
@@ -48,6 +50,8 @@ export default function App() {
                 <Route path="issues/:issueKey" element={<IssueDetailPage />} />
                 <Route path="wbs" element={<WbsPage />} />
                 <Route path="rr" element={<ResponsibilityPage />} />
+              <Route path="reviews" element={<ReviewsListPage />} />
+              <Route path="reviews/:reviewId" element={<ReviewDetailPage />} />
                 <Route path="docs" element={<DocsTreePage />} />
                 <Route path="docs/:pageId" element={<PageDetailPage />} />
                 <Route path="trace" element={<TraceabilityPage />} />

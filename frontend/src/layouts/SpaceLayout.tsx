@@ -8,6 +8,7 @@ const TABS = [
   { to: 'wbs', label: 'WBS', end: false },
   { to: 'rr', label: 'R&R', end: false },
   { to: 'docs', label: 'Docs', end: false },
+  { to: 'reviews', label: 'Reviews', end: false },
   { to: 'trace', label: 'Traceability', end: false },
   { to: 'compliance', label: 'Compliance', end: false },
   { to: 'export', label: 'Export', end: false },
