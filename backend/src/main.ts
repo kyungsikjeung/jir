@@ -6,6 +6,8 @@ import compression from 'compression';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { AuditService } from './modules/audit/audit.service';
 import * as winston from 'winston';
 import { WinstonModule } from 'nest-winston';
 
@@ -41,7 +43,7 @@ async function bootstrap() {
   // Global pipes, filters, interceptors
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new LoggingInterceptor());
+  app.useGlobalInterceptors(new LoggingInterceptor(), new AuditInterceptor(app.get(AuditService)));
 
   // API prefix
   app.setGlobalPrefix('api');

@@ -666,6 +666,49 @@ async function main() {
   console.log(`   테스터: tester@alm.local / test1234`);
   console.log(`   외부감사자: auditor@external.test / audit1234`);
   console.log(`   스페이스: DEMO (${space.id})\n`);
+
+  // ── Template Package & Version (ASPICE 골든 패스) ─────────
+  const templatePkg = await prisma.templatePackage.findFirst({
+    where: { orgId: ORG_ID, name: 'ASPICE Golden Path' },
+  });
+  let templatePkgId;
+  if (!templatePkg) {
+    const created = await prisma.templatePackage.create({
+      data: {
+        orgId: ORG_ID,
+        name: 'ASPICE Golden Path',
+        description: 'SYS.2 → SWE.1 → SWE.4 + SUP.8 + MAN.3 골든 패스 템플릿',
+        isSystem: true,
+        isPublished: true,
+        createdById: admin.id,
+      },
+    });
+    templatePkgId = created.id;
+  } else {
+    templatePkgId = templatePkg.id;
+  }
+
+  const templateVersion = await prisma.templateVersion.findFirst({
+    where: { packageId: templatePkgId, version: 1 },
+  });
+  if (!templateVersion) {
+    await prisma.templateVersion.create({
+      data: {
+        packageId: templatePkgId,
+        version: 1,
+        name: 'v1.0',
+        processes: [
+          { code: 'SYS.2', name: 'System Requirements Analysis', isApplicable: true },
+          { code: 'SWE.1', name: 'Software Requirements Analysis', isApplicable: true },
+          { code: 'SWE.4', name: 'Software Unit Verification', isApplicable: true },
+          { code: 'SUP.8', name: 'Configuration Management', isApplicable: true },
+          { code: 'MAN.3', name: 'Project Management', isApplicable: true },
+        ],
+        createdById: admin.id,
+      },
+    });
+    console.log(`  ✓ Template: ASPICE Golden Path v1`);
+  }
 }
 
 main()

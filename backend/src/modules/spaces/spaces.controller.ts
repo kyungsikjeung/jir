@@ -1,5 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Request,
+} from '@nestjs/common';
 import { SpacesService } from './spaces.service';
+import { CreateSpaceDto } from './dto/create-space.dto';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 @Controller('spaces')
 export class SpacesController {
@@ -16,8 +28,17 @@ export class SpacesController {
   }
 
   @Post()
-  async create(@Body() body: { name: string; key: string; orgId: string; createdById?: string }) {
-    return this.spacesService.create(body);
+  @RequirePermission('space:create')
+  async create(@Body() dto: CreateSpaceDto, @Request() req: any) {
+    return this.spacesService.create({
+      key: dto.key,
+      name: dto.name,
+      orgId: dto.orgId,
+      description: dto.description,
+      templateVersionId: dto.templateVersionId,
+      memberEmails: dto.memberEmails,
+      createdById: req.user?.id,
+    });
   }
 
   @Put(':key')

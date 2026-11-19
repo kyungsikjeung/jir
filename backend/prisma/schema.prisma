@@ -217,6 +217,7 @@ model WorkItem {
   version         Int      @default(1)
   body            Json?
   bodyText        String?
+  customFields    Json     @default("{}")
   labels          String[]
   aspiceProcess   String?
   asilLevel       String?
@@ -755,17 +756,22 @@ model Approval {
 }
 
 model ElectronicSignature {
-  id             String   @id @default(uuid())
-  entityType     String
-  entityId       String
-  signerId       String
-  signatureType  String
-  signatureData  String
-  signedAt       DateTime @default(now())
-  ipAddress      String?
-  isEvidence     Boolean  @default(true)
-  evidenceTag    String?
-  comment        String?
+  id              String   @id @default(uuid())
+  entityType      String
+  entityId        String
+  signerId        String
+  signatureType   String
+  signatureData   String
+  contentHash     String?
+  signedVersionId String?
+  signedAt        DateTime @default(now())
+  ipAddress       String?
+  isEvidence      Boolean  @default(true)
+  evidenceTag     String?
+  comment         String?
+  verificationStatus String @default("valid")
+  revokedAt       DateTime?
+  revokedById     String?
   @@unique([entityType, entityId, signerId])
   @@map("electronic_signatures")
 }
@@ -787,6 +793,8 @@ model AuditLog {
   actorIp        String?
   actorUserAgent String?
   sessionId      String?
+  previousHash   String?
+  chainHash      String
   isEvidence     Boolean  @default(false)
   evidenceTag    String?
   createdAt      DateTime @default(now())
@@ -1350,4 +1358,123 @@ model RequirementChangeHistory {
   changedById    String?
   changedAt      DateTime @default(now())
   @@map("requirement_change_history")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Template (조직 템플릿 + 버전 스냅샷)
+// ════════════════════════════════════════════════════════════════════════
+
+model TemplatePackage {
+  id            String   @id @default(uuid())
+  orgId         String
+  name          String
+  description   String?
+  isSystem      Boolean  @default(false)
+  isPublished   Boolean  @default(false)
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@map("template_packages")
+}
+
+model TemplateVersion {
+  id               String   @id @default(uuid())
+  packageId        String
+  version          Int
+  name             String?
+  description      String?
+  processes        Json     @default("[]")
+  workflows        Json     @default("[]")
+  fieldDefinitions Json     @default("[]")
+  deliverables     Json     @default("[]")
+  rrDefaults       Json     @default("[]")
+  wbsSkeleton      Json     @default("[]")
+  createdById      String?
+  createdAt        DateTime @default(now())
+  @@unique([packageId, version])
+  @@map("template_versions")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Process Workspace & Access (프로세스 워크스페이스, 할당, 접근)
+// ════════════════════════════════════════════════════════════════════════
+
+model ProcessWorkspace {
+  id             String   @id @default(uuid())
+  spaceId        String
+  processCode    String
+  name           String
+  description    String?
+  isApplicable   Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@unique([spaceId, processCode])
+  @@index([spaceId])
+  @@map("process_workspaces")
+}
+
+model ProcessAssignment {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  roleId       String
+  userId       String
+  isPrimary    Boolean  @default(false)
+  assignedById String?
+  assignedAt   DateTime @default(now())
+  expiresAt    DateTime?
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("process_assignments")
+}
+
+model ProcessAccessGrant {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  userId       String
+  permission   String   @default("view")
+  grantedById  String?
+  grantedAt    DateTime @default(now())
+  expiresAt    DateTime?
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("process_access_grants")
+}
+
+model FieldDefinition {
+  id                   String   @id @default(uuid())
+  spaceId              String?
+  typeId               String?
+  key                  String
+  label                String
+  labelKo              String?
+  labelEn              String?
+  fieldType            String
+  isRequired           Boolean  @default(false)
+  requiredForApproval  Boolean  @default(false)
+  validation           Json     @default("{}")
+  sortOrder            Int      @default(0)
+  isSoftDeleted        Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  @@index([spaceId])
+  @@index([typeId])
+  @@map("field_definitions")
+}
+
+model AuditEvent {
+  id           String   @id @default(uuid())
+  entityType   String
+  entityId     String
+  action       String
+  actorId      String?
+  oldHash      String?
+  newHash      String?
+  chainHash    String
+  createdAt    DateTime @default(now())
+  ipAddress    String?
+  userAgent    String?
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_events")
 }

@@ -23,6 +23,7 @@ import { StakeholdersModule } from './modules/stakeholders/stakeholders.module';
 import { ResponsibilitiesModule } from './modules/responsibilities/responsibilities.module';
 import { GitModule } from './modules/git/git.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { TemplateModule } from './modules/templates/template.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -50,6 +51,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     ResponsibilitiesModule,
     GitModule,
     AuditModule,
+    TemplateModule,
   ],
   providers: [
     // 전역 JWT 인증 (@Public() 제외)
