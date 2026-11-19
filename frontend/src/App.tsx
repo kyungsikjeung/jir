@@ -26,6 +26,7 @@ import ReviewDetailPage from './pages/spaces/ReviewDetailPage';
 import ApprovalsPage from './pages/spaces/ApprovalsPage';
 import SignaturesPage from './pages/spaces/SignaturesPage';
 import AuditPage from './pages/spaces/AuditPage';
+import MyWorkPage from './pages/spaces/MyWorkPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const queryClient = new QueryClient({
@@ -58,6 +59,7 @@ export default function App() {
               <Route path="approvals" element={<ApprovalsPage />} />
               <Route path="signatures" element={<SignaturesPage />} />
               <Route path="audit" element={<AuditPage />} />
+              <Route path="mywork" element={<MyWorkPage />} />
                 <Route path="docs" element={<DocsTreePage />} />
                 <Route path="docs/:pageId" element={<PageDetailPage />} />
                 <Route path="trace" element={<TraceabilityPage />} />

@@ -12,6 +12,7 @@ const TABS = [
   { to: 'approvals', label: 'Approvals', end: false },
   { to: 'signatures', label: '전자서명', end: false },
   { to: 'audit', label: '감사', end: false },
+  { to: 'mywork', label: 'My Work', end: false },
   { to: 'trace', label: 'Traceability', end: false },
   { to: 'compliance', label: 'Compliance', end: false },
   { to: 'export', label: 'Export', end: false },
