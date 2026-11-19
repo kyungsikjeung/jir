@@ -75,7 +75,7 @@
 // GET /api/compliance/spaces/:key/baselines/:id/diff (신규 — BaselineItem 비교)
 ```
 **테스트:** `compliance.service.spec.ts` — 잠금 생성, 잠금된 baseline의 BaselineItem 수정 거부, diff 비교
-**완료:** 기준선 페이지(비교/잠금)
+**완료:** 기준선 페이지(목록/비교/잠금)
 
 ### T6. Export
 **파일:** Export endpoints 재확인(`export.controller.ts`) + `export.service.ts` (재사용)
