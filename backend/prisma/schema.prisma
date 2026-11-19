@@ -563,6 +563,10 @@ model Baseline {
   baselineType  String   @default("release")
   status        String   @default("draft")
   snapshotData  Json?
+  isLocked      Boolean  @default(false)
+  lockedAt      DateTime?
+  lockedById    String?
+  lockReason    String?
   approvedById  String?
   approvedAt    DateTime?
   releasedAt    DateTime?

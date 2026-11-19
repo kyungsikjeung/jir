@@ -36,6 +36,24 @@ export class ComplianceController {
     return this.complianceService.updateChecklist(id, body);
   }
 
+  @Post('baselines/:id/lock')
+  async lockBaseline(
+    @Param('key') key: string,
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    return this.complianceService.lockBaseline(key, id, {
+      reason: body.reason,
+      userId: req.user?.id || body.userId || 'system',
+    });
+  }
+
+  @Get('baselines/:id/diff')
+  async getBaselineDiff(@Param('key') key: string, @Param('id') id: string) {
+    return this.complianceService.getBaselineDiff(key, id);
+  }
+
   @Post('assessments')
   async createAssessment(@Param('key') key: string, @Body() body: any, @Req() req: any) {
     return this.complianceService.createAssessment(key, body, req.user?.id || body.assessorId || 'system');

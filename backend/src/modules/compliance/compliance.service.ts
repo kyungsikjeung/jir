@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -9,6 +9,14 @@ export class ComplianceService {
     const space = await this.prisma.space.findUnique({ where: { key } });
     if (!space) throw new NotFoundException(`Space not found: ${key}`);
     return space;
+  }
+
+  private async findBaseline(spaceId: string, baselineId: string) {
+    const baseline = await this.prisma.baseline.findUnique({ where: { id: baselineId } });
+    if (!baseline || baseline.spaceId !== spaceId) {
+      throw new NotFoundException(`Baseline not found: ${baselineId}`);
+    }
+    return baseline;
   }
 
   /** ASPICE 프로세스별 컴플라이언스 요약 */
@@ -128,5 +136,81 @@ export class ComplianceService {
       where: { id: baselineId },
       data: { status: 'released', releasedAt: new Date(), approvedById: userId, approvedAt: new Date() },
     });
+  }
+
+  /** 기준선 잠금 (잠긴 기준선은 BaselineItem 변경 금지) */
+  async lockBaseline(
+    spaceKey: string,
+    baselineId: string,
+    data: { reason?: string; userId: string },
+  ) {
+    const space = await this.space(spaceKey);
+    const baseline = await this.findBaseline(space.id, baselineId);
+    if (baseline.isLocked) {
+      throw new BadRequestException(`Baseline is already locked: ${baseline.name}`);
+    }
+    return this.prisma.baseline.update({
+      where: { id: baselineId },
+      data: {
+        isLocked: true,
+        lockedAt: new Date(),
+        lockedById: data.userId,
+        lockReason: data.reason ?? null,
+      },
+    });
+  }
+
+  /** 기준선 vs 현재 상태 비교 (변화한/추가된 BaselineItem) */
+  async getBaselineDiff(spaceKey: string, baselineId: string) {
+    const space = await this.space(spaceKey);
+    const baseline = await this.findBaseline(space.id, baselineId);
+
+    const baselineItems = await this.prisma.baselineItem.findMany({
+      where: { baselineId },
+    });
+    const currentItems = await this.prisma.workItem.findMany({
+      where: { spaceId: space.id },
+      select: { id: true, version: true },
+    });
+
+    const currentById = new Map(currentItems.map((i) => [i.id, i.version]));
+    const baselineById = new Map(baselineItems.map((i) => [i.itemId, i.itemVersion]));
+
+    const changedSinceBaseline = baselineItems
+      .map((bi) => ({ bi, currentVersion: currentById.get(bi.itemId) }))
+      .filter(
+        ({ bi, currentVersion }) =>
+          currentVersion !== undefined &&
+          bi.itemVersion !== null &&
+          currentVersion !== bi.itemVersion,
+      )
+      .map(({ bi, currentVersion }) => ({
+        itemType: bi.itemType,
+        itemId: bi.itemId,
+        baselineVersion: bi.itemVersion,
+        currentVersion,
+      }));
+    const addedSinceBaseline = currentItems
+      .filter((i) => !baselineById.has(i.id))
+      .map((i) => ({ itemType: 'work_item', itemId: i.id, currentVersion: i.version }));
+
+    return {
+      baselineId: baseline.id,
+      isLocked: baseline.isLocked,
+      changedSinceBaseline,
+      addedSinceBaseline,
+      hasChanges: changedSinceBaseline.length > 0 || addedSinceBaseline.length > 0,
+    };
+  }
+
+  /** 잠긴 기준선의 BaselineItem 변경은 거부 (다른 서비스에서 호출) */
+  async assertBaselineUnlocked(baselineId: string) {
+    const baseline = await this.prisma.baseline.findUnique({ where: { id: baselineId } });
+    if (!baseline) throw new NotFoundException(`Baseline not found: ${baselineId}`);
+    if (baseline.isLocked) {
+      throw new BadRequestException(
+        `Baseline is locked: ${baseline.name}${baseline.lockReason ? ` (${baseline.lockReason})` : ''}`,
+      );
+    }
   }
 }
