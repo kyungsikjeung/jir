@@ -18,6 +18,7 @@ import DocsTreePage from './pages/spaces/DocsTreePage';
 import PageDetailPage from './pages/spaces/PageDetailPage';
 import TraceabilityPage from './pages/spaces/TraceabilityPage';
 import CompliancePage from './pages/spaces/CompliancePage';
+import ExportPage from './pages/spaces/ExportPage';
 import WbsPage from './pages/spaces/WbsPage';
 import ResponsibilityPage from './pages/spaces/ResponsibilityPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -51,6 +52,7 @@ export default function App() {
                 <Route path="docs/:pageId" element={<PageDetailPage />} />
                 <Route path="trace" element={<TraceabilityPage />} />
                 <Route path="compliance" element={<CompliancePage />} />
+              <Route path="export" element={<ExportPage />} />
               </Route>
             </Route>
           </Route>

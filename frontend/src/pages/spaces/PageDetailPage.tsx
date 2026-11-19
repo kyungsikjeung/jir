@@ -78,6 +78,27 @@ export default function PageDetailPage() {
     enabled: !!pageId,
   });
 
+  const { data: links } = useQuery({
+    queryKey: ['doc-links', pageId],
+    queryFn: async () => {
+      const res = await apiClient.get(`/api/spaces/${spaceKey}/trace/links?itemId=${pageId}`);
+      return res.data as any[];
+    },
+    enabled: !!page,
+  });
+
+  const resolveSuspectMutation = useMutation({
+    mutationFn: (linkId: string) =>
+      apiClient.post(`/api/spaces/${spaceKey}/trace/suspect/${linkId}/resolve`, {
+        resolution: 'confirmed',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['doc-links', pageId] });
+      toast.success('suspect 표시를 확인했습니다.');
+    },
+    onError: () => toast.error('확인하지 못했습니다.'),
+  });
+
   useEffect(() => {
     if (!page) return;
     setTitle(page.title ?? '');
@@ -334,6 +355,47 @@ export default function PageDetailPage() {
           <p className="text-sm text-gray-500">버전 이력이 없습니다.</p>
         )}
       </section>
+
+      {links && links.length > 0 && (
+        <section className="bg-white rounded-lg shadow p-6" aria-labelledby="doc-links-heading">
+          <h2 id="doc-links-heading" className="text-lg font-semibold mb-3">
+            연결된 항목 ({links.length})
+          </h2>
+          <ul className="space-y-2" style={{ listStyle: 'none', padding: 0 }}>
+            {links.map((l: any) => (
+              <li
+                key={l.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-blue-600">
+                    {l.direction === 'out' ? `→ ${l.partnerKey}` : `← ${l.partnerKey}`}
+                  </span>
+                  {l.partnerTitle && <span className="text-gray-700">{l.partnerTitle}</span>}
+                  <span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-xs">
+                    {l.linkType}
+                  </span>
+                  {l.isSuspect && (
+                    <span className="badge badge-obsolete" role="status">
+                      suspect
+                    </span>
+                  )}
+                </div>
+                {l.isSuspect && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => resolveSuspectMutation.mutate(l.id)}
+                    disabled={resolveSuspectMutation.isPending}
+                  >
+                    확인
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {page.comments?.length > 0 && (
         <section className="bg-white rounded-lg shadow p-6" aria-labelledby="comments-heading">

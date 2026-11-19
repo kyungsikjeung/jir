@@ -10,6 +10,7 @@ const TABS = [
   { to: 'docs', label: 'Docs', end: false },
   { to: 'trace', label: 'Traceability', end: false },
   { to: 'compliance', label: 'Compliance', end: false },
+  { to: 'export', label: 'Export', end: false },
 ];
 
 export default function SpaceLayout() {
