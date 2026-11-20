@@ -77,6 +77,11 @@ Infra     Docker Compose (CLI) · Caddy · OCI Always Free 지원
 
 ## 빠른 시작 (로컬)
 
+> **원커맨드 부트스트래핑**: 인프라 기동 후
+> `./scripts/bootstrap.sh all` (의존성 → 마이그레이션 → 시드 → 검증)
+> → `./scripts/bootstrap.sh dev` (서버 기동).
+> Windows에서는 WSL2 Ubuntu에서 실행하세요. Makefile 사용 시 `make all`, `make dev`.
+
 ### 1) 인프라 실행 (Docker Compose CLI — 무료)
 
 ```bash
@@ -226,6 +231,10 @@ jir/
 | [ADDITIONAL_FEATURES.md](./ADDITIONAL_FEATURES.md) | 140+ 확장 기능 (R&R, WBS, 워크플로우 빌더, 전자서명, 내보내기) |
 | [FEATURE_INTEGRATION.md](./FEATURE_INTEGRATION.md) | 기능 의존 관계 및 구현 순서 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | 로컬 / OCI 무료 티어 / 클라우드 / 온프레미스 배포 |
+| [RELEASE.md](./RELEASE.md) | dev → pilot → release 릴리스 체크리스트 |
+| [CHANGELOG.md](./CHANGELOG.md) | 버전별 변경 이력 |
+| [docs/versions/README.md](./docs/versions/README.md) | SemVer·태그·버전 정책 |
+| [docs/pilot/ASPICE_PRINCIPLES_REVIEW.md](./docs/pilot/ASPICE_PRINCIPLES_REVIEW.md) | ASPICE 10원칙 반영 검토 |
 
 ---
 
@@ -240,6 +249,12 @@ jir/
 - [x] WBS / R&R 매트릭스 UI
 - [x] Word / Excel / PDF / HTML 내보내기 구현
 - [x] 단위 테스트 + GitHub Actions CI 파이프라인
+- [x] M1 — 템플릿/RBAC/감사 해시 체인/프로젝트 생성
+- [x] M2 — 동적 타입·필드/전이 검증/suspect 자동 탐지
+- [x] M3 — 문서·리뷰·승인·전자서명·기준선 잠금·감사·My Work
+- [x] M4 — 자동화 엔진/버전·릴리스 프로세스/부트스트래핑
+- [x] 전자서명 HMAC 무결성 + 검증 API + 비밀번호 재인증
+- [ ] 영향 분석 API + ChangeRequest 워크플로우
 - [ ] 외부 이해관계자 포털 (초대·승인 플로우)
 - [ ] Keycloak SSO 연동
 - [ ] E2E 테스트

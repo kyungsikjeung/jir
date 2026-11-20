@@ -1,5 +1,10 @@
 # ASPICE ALM — 배포 가이드 (Deployment Guide)
 
+> **부트스트래핑/릴리스**: 인프라 기동 후 애플리케이션 설치·시드는
+> [`scripts/bootstrap.sh`](./scripts/bootstrap.sh)(또는 `Makefile`)로 자동화됩니다.
+> 배포 전 체크리스트는 [`RELEASE.md`](./RELEASE.md), 버전 규칙은
+> [`docs/versions/README.md`](./docs/versions/README.md)를 따릅니다.
+
 ## 1. 배포 옵션 개요
 
 | 옵션 | 환경 | 비용 | 적합한 경우 |

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { FieldDefinitionService } from '../field-definitions/field-definition.service';
 import { TraceabilityService } from '../traceability/traceability.service';
+import { WorkflowEngine } from '../engines/engines.service';
 
 @Injectable()
 export class WorkItemsService {
@@ -9,7 +10,13 @@ export class WorkItemsService {
     private prisma: PrismaService,
     private fieldDefinitionService: FieldDefinitionService,
     private traceabilityService: TraceabilityService,
+    private workflowEngine?: WorkflowEngine,
   ) {}
+
+  /** M4: 전이 로직은 WorkflowEngine에 위임 (미주입 시 동일 DB로 생성 — 테스트 호환) */
+  private getWorkflowEngine(): WorkflowEngine {
+    return this.workflowEngine ?? new WorkflowEngine(this.prisma);
+  }
 
   async findAll(spaceKey: string, filters?: { status?: string; priority?: string; assigneeId?: string; type?: string }) {
     const space = await this.prisma.space.findUnique({ where: { key: spaceKey } });
@@ -355,109 +362,9 @@ export class WorkItemsService {
    * @param transitionName 상태 이름 (예: "In Review", "Approved") 또는 상태 ID
    * @throws BadRequestException 전이가 없거나 guard condition이 통과하지 않을 때
    */
+  /** M4: WorkflowEngine에 위임 (전이 검증 → postActions → 이력 기록) */
   async transition(issueKey: string, transitionName: string, userId: string, comment?: string) {
-    const item = await this.findByKey(issueKey);
-
-    // 목표 상태
-    const targetState = await this.prisma.workflowState.findFirst({
-      where: {
-        OR: [{ id: transitionName }, { name: { equals: transitionName, mode: 'insensitive' } }],
-      },
-    });
-    if (!targetState) {
-      throw new BadRequestException(`Transition not allowed: ${transitionName}`);
-    }
-
-    // 현재 상태
-    const currentState = item.workflowStateId
-      ? await this.prisma.workflowState.findUnique({ where: { id: item.workflowStateId } })
-      : null;
-
-    // fromStateId → toStateId 전이 존재 확인 (현재 상태에서 목표 상태로)
-    const candidates = await this.prisma.workflowTransition.findMany({
-      where: { workflowId: targetState.workflowId, toStateId: targetState.id },
-    });
-    const transition =
-      candidates.find((t) => t.fromStateId === currentState?.id) ??
-      (currentState ? null : candidates.find((t) => t.fromStateId === null));
-    if (!transition) {
-      throw new BadRequestException(`Transition not allowed: ${transitionName}`);
-    }
-
-    // guard condition 평가
-    if (!this.evaluateCondition(transition, item)) {
-      throw new BadRequestException(`Transition blocked by condition: ${transitionName}`);
-    }
-
-    const data: any = {
-      workflowStateId: targetState.id,
-      status: targetState.name,
-      resolvedAt: targetState.category === 'done' ? new Date() : null,
-      updatedAt: new Date(),
-    };
-    const updated = await this.prisma.workItem.update({ where: { id: item.id }, data });
-
-    // postActions 실행
-    await this.runPostActions(transition.postActions, updated, userId);
-
-    // 전이 이력 기록 (transitionId, fromStateId 포함)
-    await this.prisma.workflowTransitionHistory.create({
-      data: {
-        workItemId: item.id,
-        transitionId: transition.id,
-        fromStateId: currentState?.id ?? null,
-        toStateId: targetState.id,
-        performedById: userId,
-        comment,
-      },
-    });
-
-    return updated;
-  }
-
-  /** transition guard condition 평가 (conditionType + conditionConfig) */
-  private evaluateCondition(transition: any, item: any): boolean {
-    const type = transition.conditionType;
-    if (!type) return true;
-    const cfg = transition.conditionConfig || {};
-    const customFields = (item.customFields || {}) as Record<string, any>;
-    switch (type) {
-      case 'required_fields': {
-        const fields = Array.isArray(cfg.fields) ? cfg.fields : [];
-        return fields.every(
-          (k: string) =>
-            customFields[k] !== undefined && customFields[k] !== null && customFields[k] !== '',
-        );
-      }
-      case 'field_equals': {
-        const key = cfg.key ?? cfg.field;
-        if (!key) return true;
-        return customFields[key] === cfg.value;
-      }
-      default:
-        return true;
-    }
-  }
-
-  /** 전이 후 실행할 postActions (postActions JSON) */
-  private async runPostActions(postActions: any, item: any, userId: string) {
-    const actions = Array.isArray(postActions) ? postActions : [];
-    if (!actions.length) return;
-    for (const action of actions) {
-      if (!action || typeof action !== 'object') continue;
-      switch (action.type) {
-        case 'set_field': {
-          const key = action.key ?? action.field;
-          if (!key) break;
-          await this.prisma.workItem.update({
-            where: { id: item.id },
-            data: { customFields: { ...(item.customFields || {}), [key]: action.value ?? null } },
-          });
-          break;
-        }
-        // 알 수 없는 postAction은 실행하지 않는다
-      }
-    }
+    return this.getWorkflowEngine().execute({ issueKey, transitionName, userId, comment });
   }
 
   /** customFields 서버 검증: 필수 필드·타입별 검증 */
