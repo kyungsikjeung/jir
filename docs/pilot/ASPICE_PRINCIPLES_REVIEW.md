@@ -1,14 +1,15 @@
 # ASPICE/ALM 10원칙 반영 검토 (2026-11-20)
 
-사용자가 제시한 10개 원칙이 현재 코드베이스(M1~M3 구현 완료, M4 계획 단계)에
+사용자가 제시한 10개 원칙이 현재 코드베이스(M1~M4 구현 완료, 0.1.0 파일럿 기준선)에
 실제로 반영되었는지 **코드 증거 기반**으로 검토한 결과.
+M4 완료 후 원칙 9·10 상태를 갱신했다(2026-11-20).
 
 상태 범례:
 - **반영** — 원칙이 데이터 모델 + 서비스 + UI까지 구현됨
 - **부분** — 기반은 있으나 일부가 비어 있거나 연결이 끊김
 - **미반영** — 모델/스텁만 있거나 아직 없음
 
-전체 테스트: 13 suites / 81 tests pass (검토 시점 기준).
+전체 테스트: 16 suites / 98 tests pass (M4 완료 시점 기준, 앱 기동 스모크 통과).
 
 ---
 
@@ -144,30 +145,32 @@
 
 ---
 
-## 9. Manual Overhead Is Reduced — **부분**
+## 9. Manual Overhead Is Reduced — **부분 → 대부분 반영**
 
 반영된 부분:
 - 워크플로우 전이 시 guard condition 평가 + postActions 자동 실행
-  (`work-items.service.ts:423-454`)
+  → `WorkflowEngine`으로 이관되어 엔진 API(`POST /api/engines/workflow/*`)로도 실행/검증 가능
 - suspect 자동 탐지, 감사 자동 기록, 커버리지 자동 계산
+- M4 완료: `EngineRegistry` + Workflow/Audit/Notification/Export 엔진 구현 및
+  `GET /api/engines`로 등록 확인 가능
 
 남은 갭:
-- M4의 자동화 엔진(EngineRegistry/WorkflowEngine/NotificationEngine/AuditEngine/
-  ExportEngine)이 **계획만 되어 있고 미구현**
-- 알림/검색은 여전히 스텁(생성 호출자 없음) → 수동 확인이 남아 있음
+- NotificationEngine은 알림을 DB에 저장만 하고 전달 채널(WebSocket/이메일)이 없음
+- 검색 인덱싱은 여전히 스텁 → 수동 확인이 일부 남아 있음
 
 ---
 
-## 10. ASPICE Becomes Sustainable — **부분**
+## 10. ASPICE Becomes Sustainable — **반영**
 
 반영된 부분:
 - 프로세스가 템플릿/워크플로우/감사에 박혀 있어 "따르는 것이 기본 동작"이 되도록 설계됨
 - 마이그레이션 → 시드 → 서버 기동 반복 가능성 확보(M1)
+- M4 완료: 버전/릴리스 정책(`docs/versions/README.md`), `CHANGELOG.md`,
+  `RELEASE.md` 체크리스트, `scripts/bootstrap.sh`/`Makefile` 부트스트래핑 제공
+- 앱 전체 DI 그래프 부트 + `/api/engines` 라우트 매핑 스모크 확인
 
 남은 갭:
-- **버전/릴리스 프로세스, CHANGELOG, 태그 전략이 문서화되지 않음**
-  (M4 T2 계획만 존재)
-- 부트스트래핑 스크립트/실행 문서 미완성(M4 T3 계획만 존재)
+- `v0.1.0` 태그는 아직 생성되지 않음 — `RELEASE.md` 체크리스트 통과 후 부여 예정
 
 ---
 
@@ -183,14 +186,14 @@
 | 6 | Consistency Across Teams | 반영 |
 | 7 | Evidence as Byproduct | 반영 (HMAC/검증/재인증 보완 완료) |
 | 8 | Supplier Interfaces | 미반영 |
-| 9 | Manual Overhead Reduced | 부분 (M4 미구현) |
-| 10 | Sustainability | 부분 (M4 문서화 대기) |
+| 9 | Manual Overhead Reduced | 대부분 반영 (엔진 구현, 알림 전달/검색 잔여) |
+| 10 | Sustainability | 반영 (v0.1.0 태그 대기) |
 
 **즉시 보완 가치가 높은 순서**
 1. ~~전자서명 HMAC/검증/재인증~~ → 완료
 2. ~~링크 생성자 인증~~ 완료 / 영향 분석 API는 잔여 (원칙 2)
 3. ChangeRequest 워크플로우 (원칙 5)
-4. M4 엔진/버전문서 완성 (원칙 9·10)
+4. ~~M4 엔진/버전문서 완성~~ → 완료 (v0.1.0 태그만 대기)
 5. 공급사 포털 (원칙 6·8, M5)
 
 이 문서는 M4 T2(버전/릴리스 문서) 산출물로도 활용한다.

@@ -3,7 +3,7 @@
 모든 notable 변경은 이 파일에 기록한다. 형식은 [Keep a Changelog](https://keepachangelog.com/)
 를 따르며 버전 규칙은 [`docs/versions/README.md`](./docs/versions/README.md) 참조.
 
-## [0.1.0] — 2026-11-20 — 파일럿 기준선
+## [0.1.0] — 2026-11-20 — 파일럿 기준선 (태그 예정, 아직 생성되지 않음)
 
 ### 추가
 - M1: 템플릿 레지스트리/버전, 프로세스 워크스페이스, 서버 RBAC, 감사 해시 체인,

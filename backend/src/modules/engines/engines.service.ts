@@ -90,8 +90,10 @@ export class WorkflowEngine implements Engine {
     return true;
   }
 
-  async execute(params: Record<string, any>) {
+  async execute(params: Record<string, any>, context?: any) {
     const { item, target, current, transition } = await this.resolve(params);
+    // 행위자는 인증 컨텍스트에서만 취한다 (요청 본문 위조 방지)
+    const actorId = context?.userId ?? params.userId;
     if (!this.conditionPassed(transition, item)) {
       throw new BadRequestException(`Transition blocked by condition: ${params.transitionName}`);
     }
@@ -114,7 +116,7 @@ export class WorkflowEngine implements Engine {
         transitionId: transition.id,
         fromStateId: current?.id ?? null,
         toStateId: target.id,
-        performedById: params.userId,
+        performedById: actorId,
         comment: params.comment,
       },
     } as any);
@@ -156,11 +158,16 @@ export class AuditEngine implements Engine {
   readonly name = 'audit';
   constructor(@Inject(AuditService) private audit: AuditService) {}
 
-  execute(params: Record<string, any>) {
-    return this.audit.log(params as any);
+  execute(params: Record<string, any>, context?: any) {
+    // actorId/isEvidence는 클라이언트가 지정할 수 없다 — 항상 인증 컨텍스트/기본값 사용
+    const { actorId: _ignoredActor, isEvidence: _ignoredEvidence, ...safe } = params;
+    return this.audit.log({ ...safe, actorId: context?.userId, isEvidence: true } as any);
   }
 
   async verify(params: Record<string, any>) {
+    if (!params.entityType || !params.entityId) {
+      throw new BadRequestException('entityType과 entityId가 필요합니다.');
+    }
     const ok = await this.audit.verifyChain(params.entityType, params.entityId);
     return { ok: !!ok, errors: ok ? [] : ['감사 해시 체인이 유효하지 않습니다.'] };
   }

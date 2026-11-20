@@ -85,6 +85,22 @@ describe('WorkflowEngine', () => {
     );
   });
 
+  it('컨텍스트의 인증 사용자가 요청 본문의 userId보다 우선한다 (행위자 위조 방지)', async () => {
+    const prisma = workflowPrismaMock();
+    const engine = new WorkflowEngine(prisma as any);
+
+    await engine.execute(
+      { issueKey: 'DEMO-1', transitionName: 'Done', userId: '가짜관리자' },
+      { userId: '진짜사용자' },
+    );
+
+    expect(prisma.workflowTransitionHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ performedById: '진짜사용자' }),
+      }),
+    );
+  });
+
   it('허용되지 않은 전이는 execute/verify 모두 거부한다', async () => {
     const prisma = workflowPrismaMock();
     prisma.workflowTransition.findMany.mockResolvedValue([]);
@@ -110,6 +126,25 @@ describe('AuditEngine', () => {
     await expect(engine.execute({ entityType: 'work_item', entityId: 'w1', action: 'update' })).resolves.toEqual({ id: 'a1' });
     await expect(engine.verify({ entityType: 'work_item', entityId: 'w1' })).resolves.toEqual({ ok: true, errors: [] });
     expect(audit.verifyChain).toHaveBeenCalledWith('work_item', 'w1');
+  });
+
+  it('본문의 actorId/isEvidence로 증적을 위조할 수 없다', async () => {
+    const audit = { log: jest.fn().mockResolvedValue({ id: 'a1' }) } as any;
+    const engine = new AuditEngine(audit);
+
+    await engine.execute(
+      { entityType: 'work_item', entityId: 'w1', action: 'update', actorId: '가짜감사자', isEvidence: false },
+      { userId: '진짜사용자' },
+    );
+
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: '진짜사용자', isEvidence: true }),
+    );
+  });
+
+  it('대상 없이 전체 체인을 검증할 수 없다', async () => {
+    const engine = new AuditEngine({} as any);
+    await expect(engine.verify({ entityType: 'work_item' })).rejects.toThrow(BadRequestException);
   });
 });
 
