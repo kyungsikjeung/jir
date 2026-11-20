@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, Query, Request } from '@nestjs/common';
 import { TraceabilityService } from './traceability.service';
 
 @Controller('spaces/:key/trace')
@@ -25,13 +25,18 @@ export class TraceabilityController {
     return this.traceabilityService.getLinks(key, itemId);
   }
 
+  /** 링크 생성자·해결자는 인증된 사용자로 강제 (body 위조 방지) */
   @Post('links')
-  async createLink(@Body() body: any) {
-    return this.traceabilityService.createLink(body, body.userId || 'system');
+  async createLink(@Body() body: any, @Request() req: any) {
+    return this.traceabilityService.createLink(body, req.user?.id);
   }
 
   @Post('suspect/:id/resolve')
-  async resolveSuspect(@Param('id') id: string, @Body() body: { resolution: string }) {
-    return this.traceabilityService.resolveSuspect(id, body.resolution, 'system');
+  async resolveSuspect(
+    @Param('id') id: string,
+    @Body() body: { resolution: string },
+    @Request() req: any,
+  ) {
+    return this.traceabilityService.resolveSuspect(id, body.resolution, req.user?.id);
   }
 }

@@ -766,6 +766,7 @@ model ElectronicSignature {
   signerId        String
   signatureType   String
   signatureData   String
+  signatureHash   String?
   contentHash     String?
   signedVersionId String?
   signedAt        DateTime @default(now())
